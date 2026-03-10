@@ -8,10 +8,26 @@
             <div class="menu-container">
                 <nav class="menu">
                     <RouterLink @click="closeSidebar" to="/overview">Overview</RouterLink>
-                    <RouterLink @click="closeSidebar" to="/income">Income</RouterLink>
-                    <RouterLink @click="closeSidebar" to="/expense">Expense</RouterLink>
+                    <RouterLink @click="closeSidebar" to="/performance">Performance</RouterLink>
+                    <RouterLink @click="closeSidebar" to="/insight">Insight</RouterLink>
+                    <RouterLink @click="closeSidebar" to="/market">Market</RouterLink>
                     <RouterLink @click="closeSidebar" to="/report">Report</RouterLink>
-                    <RouterLink @click="closeSidebar" to="/setting">Setting</RouterLink>
+                     <div class="menu-group">
+                        <div class="menu-parent" @click="toggleSetting">
+                            Setting
+                            <span class="arrow">{{ settingOpen ? '▾' : '▸' }}</span>
+                        </div>
+
+                        <div v-if="settingOpen" class="submenu">
+                            <RouterLink @click="closeSidebar" to="/setting/users">
+                                Users
+                            </RouterLink>
+
+                            <RouterLink @click="closeSidebar" to="/setting/configuration">
+                                Configuration
+                            </RouterLink>
+                        </div>
+                     </div>
                 </nav>
             </div>
 
@@ -50,6 +66,7 @@
         </div>
     </div>
 </template>
+
 <style scoped>
 /* Root layout */
 .layout {
@@ -138,6 +155,41 @@
     background: none;
     border: none;
     cursor: pointer;
+}
+
+.menu-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.menu-parent {
+    padding: 10px 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.menu-parent:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.submenu {
+    display: flex;
+    flex-direction: column;
+    margin-left: 12px;
+    gap: 4px;
+}
+
+.submenu a {
+    padding: 8px 12px;
+    font-size: 14px;
+    border-radius: 6px;
+}
+
+.arrow {
+    font-size: 12px;
 }
 
 /* Profile (right of sidebar) */
@@ -313,6 +365,12 @@ const toggleSidebar = () => {
 
 const closeSidebar = () => {
     isSidebarOpen.value = false
+}
+
+const settingOpen = ref(false)
+
+const toggleSetting = () => {
+    settingOpen.value = !settingOpen.value
 }
 
 const logout = () => {

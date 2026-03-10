@@ -1,10 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import DashboardLayout from '../layouts/DashboardLayout.vue'
 import Overview from '../views/Overview.vue'
-import Income from '../views/Income.vue'
-import Expense from '../views/Expense.vue'
+import Performance from '../views/Performance.vue'
+import Insight from '../views/Insight.vue'
+import Market from '../views/Market.vue'
 import Report from '../views/Report.vue'
-import Setting from '../views/Setting.vue'
+import Users from '../views/Users.vue'
+import Configuration from '../views/Configuration.vue'
 
 const routes = [
     {
@@ -13,10 +15,12 @@ const routes = [
         children: [
             { path: '', redirect: '/overview' },
             { path: 'overview', component: Overview },
-            { path: 'income', component: Income },
-            { path: 'expense', component: Expense },
+            { path: 'performance', component: Performance },
+            { path: 'insight', component: Insight },
+            { path: 'market', component: Market },
             { path: 'report', component: Report },
-            { path: 'setting', component: Setting },
+            { path: 'setting/users', component: Users },
+            { path: 'setting/configuration', component: Configuration },
         ],
     },
 ]
