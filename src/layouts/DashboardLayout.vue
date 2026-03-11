@@ -31,7 +31,7 @@
                 </nav>
             </div>
 
-            <button class="logout-sidebar" @click="logout">Logout</button>
+            <button class="logout-sidebar" @click="handleLogout">Logout</button>
         </aside>
 
         <!-- Overlay (mobile) -->
@@ -54,7 +54,7 @@
 
                     <!-- Username + Logout -->
                     <span class="username">John Doe</span>
-                    <!-- <button class="logout-btn" @click="logout">Logout</button> -->
+                    <!-- <button class="logout-btn" @click="handleLogout">Logout</button> -->
                 </div>
 
             </header>
@@ -78,7 +78,6 @@
 }
 
 /* Sidebar */
-/* Sidebar */
 .sidebar {
     width: 220px;
     background: var(--bg-sidebar);
@@ -89,7 +88,6 @@
     height: 100vh;
 }
 
-
 .logo {
     font-size: 20px;
     font-weight: 600;
@@ -97,11 +95,8 @@
 }
 
 /* Sidebar menu */
-
-/* Let menu stick to top */
 .menu-container {
     flex: 1;
-    /* takes available space but does not stretch items */
     display: flex;
     flex-direction: column;
 }
@@ -195,7 +190,6 @@
 /* Profile (right of sidebar) */
 .profile {
     margin-left: auto;
-    /* 🔥 THIS pushes it to the far right */
     display: flex;
     align-items: center;
     gap: 12px;
@@ -206,7 +200,6 @@
     height: 32px;
     border-radius: 50%;
     background: #9ca3af;
-    /* gray for placeholder */
     color: white;
     font-size: 18px;
     font-weight: bold;
@@ -307,14 +300,12 @@
     color: var(--text-main);
 }
 
-
 /* Content with margin & padding */
 .content {
     flex: 1;
     padding: 24px;
     margin: 1px;
     background: var(--bg-panel);
-    /* use CSS variable */
     border-radius: 8px;
     overflow: auto;
     color: var(--text-main);
@@ -355,7 +346,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
+const router = useRouter()
 const isSidebarOpen = ref(false)
 const theme = ref('light')
 
@@ -373,8 +366,18 @@ const toggleSetting = () => {
     settingOpen.value = !settingOpen.value
 }
 
-const logout = () => {
-    alert('Logged out')
+// Updated logout function
+const handleLogout = () => {
+    // Clear authentication data
+    localStorage.removeItem('isAuthenticated')
+    localStorage.removeItem('rememberMe')
+    
+    // Optional: Show a logout message
+    // You can replace this with a toast notification
+    alert('Successfully logged out!')
+    
+    // Redirect to login page
+    router.push('/login')
 }
 
 /* 🌗 Theme */
@@ -387,5 +390,4 @@ onMounted(() => {
     const savedTheme = localStorage.getItem('theme')
     if (savedTheme) theme.value = savedTheme
 })
-
 </script>
