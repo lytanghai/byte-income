@@ -104,7 +104,7 @@
             <span class="checkbox-custom"></span>
             <span class="checkbox-label">Keep me signed in</span>
           </label>
-          <a href="#" class="forgot-link">Forgot password?</a>
+          <!-- <a href="#" class="forgot-link">Forgot password?</a> -->
         </div>
 
         <!-- Submit Button -->
@@ -133,7 +133,7 @@
 
       <!-- Footer -->
       <div class="login-footer">
-        <div class="divider">
+        <!-- <div class="divider">
           <span class="divider-text">New to our platform?</span>
         </div>
         <button class="signup-button">
@@ -141,9 +141,10 @@
           <svg class="signup-arrow" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" />
           </svg>
-        </button>
+        </button> -->
         <p class="help-text">
-          Need help? <a href="#" class="help-link">Contact support</a>
+          <!-- Need help? <a href="#" class="help-link">Contact admin for your onboarding</a> -->
+           Contact admin for your onboarding
         </p>
       </div>
     </div>

@@ -1,3 +1,14 @@
+<script setup lang="ts">
+// import NotificationContainer from './components/NotificationContainer.vue';
+import NotificationContainer from './components/NotificationContainer.vue';
+
+</script>
+
 <template>
-  <router-view />
+  <div id="app">
+    <router-view />
+    <NotificationContainer />
+  </div>
+
 </template>
+

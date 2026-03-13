@@ -12,7 +12,7 @@
                     <RouterLink @click="closeSidebar" to="/insight">Insight</RouterLink>
                     <RouterLink @click="closeSidebar" to="/market">Market</RouterLink>
                     <RouterLink @click="closeSidebar" to="/report">Report</RouterLink>
-                     <div class="menu-group">
+                    <div class="menu-group">
                         <div class="menu-parent" @click="toggleSetting">
                             Setting
                             <span class="arrow">{{ settingOpen ? '▾' : '▸' }}</span>
@@ -27,7 +27,7 @@
                                 Configuration
                             </RouterLink>
                         </div>
-                     </div>
+                    </div>
                 </nav>
             </div>
 
@@ -53,7 +53,9 @@
                     <div class="avatar">?</div>
 
                     <!-- Username + Logout -->
-                    <span class="username">John Doe</span>
+                    <span class="username">
+                        {{ (username || 'N/A').toUpperCase() }}
+                    </span> 
                     <!-- <button class="logout-btn" @click="handleLogout">Logout</button> -->
                 </div>
 
@@ -167,7 +169,7 @@
 }
 
 .menu-parent:hover {
-    background: rgba(255,255,255,0.08);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .submenu {
@@ -351,6 +353,8 @@ import { useRouter } from 'vue-router'
 const router = useRouter()
 const isSidebarOpen = ref(false)
 const theme = ref('light')
+const settingOpen = ref(false)
+const username = ref('') // Add this line
 
 const toggleSidebar = () => {
     isSidebarOpen.value = !isSidebarOpen.value
@@ -360,22 +364,19 @@ const closeSidebar = () => {
     isSidebarOpen.value = false
 }
 
-const settingOpen = ref(false)
-
 const toggleSetting = () => {
     settingOpen.value = !settingOpen.value
 }
 
-// Updated logout function
 const handleLogout = () => {
     // Clear authentication data
     localStorage.removeItem('isAuthenticated')
     localStorage.removeItem('rememberMe')
-    
+    localStorage.removeItem('userData') // Also clear user data
+
     // Optional: Show a logout message
-    // You can replace this with a toast notification
-    alert('Successfully logged out!')
-    
+    // alert('Successfully logged out!')
+
     // Redirect to login page
     router.push('/login')
 }
@@ -389,5 +390,16 @@ const toggleTheme = () => {
 onMounted(() => {
     const savedTheme = localStorage.getItem('theme')
     if (savedTheme) theme.value = savedTheme
+
+    // Load username from localStorage
+    const userData = localStorage.getItem('userData')
+    if (userData) {
+        try {
+            const parsed = JSON.parse(userData)
+            username.value = parsed.username || ''
+        } catch (e) {
+            console.error('Error parsing userData:', e)
+        }
+    }
 })
 </script>
