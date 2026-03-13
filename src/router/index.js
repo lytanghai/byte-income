@@ -67,7 +67,6 @@
 // export default router   
 
 
-
 // router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import DashboardLayout from '../layouts/DashboardLayout.vue'
@@ -83,21 +82,14 @@ import Configuration from '../views/Configuration.vue'
 const routes = [
   {
     path: '/login',
-    name: 'Login',
-    component: Login,
-    meta: { requiresGuest: true }
-  },
-  // ADD THIS - Explicit redirect for /com/login
-  {
-    path: '/com/login',
-    redirect: '/login'
+    redirect: '/' // Redirect /login to root
   },
   {
     path: '/',
     component: DashboardLayout,
     meta: { requiresAuth: true },
     children: [
-      { path: '', redirect: '/overview' },
+      { path: '', redirect: '/overview' }, // Default route
       { path: 'overview', name: 'Overview', component: Overview },
       { path: 'performance', name: 'Performance', component: Performance },
       { path: 'insight', name: 'Insight', component: Insight },
@@ -107,10 +99,15 @@ const routes = [
       { path: 'setting/configuration', name: 'Configuration', component: Configuration },
     ]
   },
-  // Catch-all redirect to login
+  // Handle /com/login specifically if needed
+  {
+    path: '/com/login',
+    redirect: '/'
+  },
+  // Catch-all redirect to root
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/login'
+    redirect: '/'
   }
 ]
 
@@ -119,21 +116,9 @@ const router = createRouter({
   routes
 })
 
-// Navigation Guard
+// Optional: Remove or simplify navigation guard if you don't need auth checks
 router.beforeEach((to, from, next) => {
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true'
-
-  // Protected route, user not logged in
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    return next('/login')
-  }
-
-  // Guest route, user already logged in
-  if (to.meta.requiresGuest && isAuthenticated) {
-    return next('/overview')
-  }
-
-  // Otherwise proceed
+  // You can keep or remove this based on your needs
   return next()
 })
 
