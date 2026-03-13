@@ -164,6 +164,8 @@ const loginError = ref('')
 const showPassword = ref(false)
 const isLoading = ref(false)
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+
 // Viewport height management
 const setVH = () => {
   const vh = window.innerHeight * 0.01
@@ -217,7 +219,7 @@ const isFormValid = computed(() => formData.username && formData.password && !er
 
 const loginUser = async (credentials) => {
   try {
-    const response = await fetch('http://localhost:8080/kark-profit/auth/login', {
+    const response = await fetch(API_BASE_URL + '/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(credentials)

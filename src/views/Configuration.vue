@@ -281,8 +281,7 @@ import { useNotification } from '../composables/useNotification'
 // Initialize notification composable
 const notification = useNotification()
 
-// API Base URL
-const API_BASE_URL = 'http://localhost:8080/kark-profit/config'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 // State
 const configs = ref([])

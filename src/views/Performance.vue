@@ -235,7 +235,7 @@ import { useNotification } from '../composables/useNotification'
 const notification = useNotification()
 
 // API Base URL
-const API_BASE_URL = 'http://localhost:8080/kark-profit/transaction'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 // State
 const selectedMonth = ref(new Date().getMonth() + 1) // 1-12
