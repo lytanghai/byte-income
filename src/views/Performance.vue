@@ -1,4 +1,4 @@
-I feel like the calendar and transactions listing are a little bog can you make them smaller by 25%.    <template>
+<template>
   <div class="performance-page">
     <div class="page-header">
       <h1>Performance</h1>
@@ -71,7 +71,7 @@ I feel like the calendar and transactions listing are a little bog can you make 
         </div>
 
         <!-- Calendar Grid -->
-        <div v-else class="calendar-grid" :class="{ 'loading': calendarLoading }">
+        <div v-else class="calendar-grid">
           <div class="weekdays">
             <span v-for="day in weekdays" :key="day">{{ day }}</span>
           </div>
@@ -99,7 +99,7 @@ I feel like the calendar and transactions listing are a little bog can you make 
           <h2>Transaction History</h2>
           <div class="transaction-filters">
             <select v-model="transactionFilter.type" @change="fetchTransactions" class="filter-select">
-              <option value="">All Types</option>
+              <option value="">All</option>
               <option value="PROFIT">Profit</option>
               <option value="LOSS">Loss</option>
               <option value="DEPOSIT">Deposit</option>
@@ -152,39 +152,37 @@ I feel like the calendar and transactions listing are a little bog can you make 
             v-for="transaction in transactions" 
             :key="transaction.id" 
             class="transaction-card"
-            :class="transaction.type.toLowerCase()"
+            :class="transaction.type?.toLowerCase()"
           >
             <div class="transaction-header">
               <span class="transaction-type">{{ transaction.type }}</span>
-              <span class="transaction-date">{{ formatTransactionDate(transaction.created_at) }}</span>
+              <span class="transaction-date">{{ formatTransactionDate(transaction.date) }}</span>
             </div>
             
             <div class="transaction-details">
               <div class="detail-item">
                 <span class="detail-label">Symbol</span>
-                <span class="detail-value">{{ transaction.symbol || 'N/A' }}</span>
+                <span class="detail-value">{{ transaction.symbol || '-' }}</span>
               </div>
               <div class="detail-item">
                 <span class="detail-label">Lot Size</span>
-                <span class="detail-value"> ***** </span>
-                
+                <span class="detail-value">{{ transaction.lot_size || '-' }}</span>
               </div>
               <div class="detail-item">
-                <span class="detail-label">Amount</span>
+                <span class="detail-label">{{ getAmountLabel(transaction.type) }}</span>
                 <span 
                   class="detail-value amount" 
-                  :class="getTransactionAmountClass(transaction)"
+                  :class="getAmountClass(transaction)"
                 >
-                  {{ formatCurrency(transaction.pnl) }}
+                  {{ formatTransactionAmount(transaction) }}
                 </span>
               </div>
             </div>
-            
           </div>
 
           <!-- Load More -->
           <div v-if="hasMoreTransactions" class="load-more">
-            <button @click="loadMoreTransactions" class="btn-load-more">
+            <button @click="loadMoreTransactions" class="btn-load-more" :disabled="transactionsLoading">
               Load More
             </button>
           </div>
@@ -292,20 +290,23 @@ const monthlyStats = computed(() => {
 
 // Helper functions
 const formatCurrency = (value) => {
+  if (value === undefined || value === null) return '$0.00'
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
-  }).format(value || 0)
+  }).format(value)
 }
 
 const formatPnL = (value) => {
   if (value === 0) return '-'
-  return value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2)
+  if (value > 0) return `+${value.toFixed(2)}`
+  return value.toFixed(2)
 }
 
 const formatTransactionDate = (dateString) => {
+  console.log(dateString)
   if (!dateString) return 'N/A'
   return new Date(dateString).toLocaleDateString('en-US', {
     month: 'short',
@@ -316,7 +317,7 @@ const formatTransactionDate = (dateString) => {
 }
 
 const formatSelectedDate = (day) => {
-  if (!day) return ''
+  if (!day || !calendarData.value) return ''
   const date = new Date(calendarData.value.year, calendarData.value.month - 1, day.day)
   return date.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -324,6 +325,33 @@ const formatSelectedDate = (day) => {
     month: 'long',
     day: 'numeric'
   })
+}
+
+const getAmountLabel = (type) => {
+  if (type === 'PROFIT' || type === 'LOSS') return 'P&L'
+  if (type === 'DEPOSIT') return 'Deposit'
+  if (type === 'WITHDRAWAL') return 'Withdrawal'
+  return 'Amount'
+}
+
+const getAmountClass = (transaction) => {
+  if (!transaction || !transaction.type) return ''
+  if (transaction.type === 'PROFIT' || transaction.type === 'DEPOSIT') return 'profit'
+  if (transaction.type === 'LOSS' || transaction.type === 'WITHDRAWAL') return 'loss'
+  return ''
+}
+
+const formatTransactionAmount = (transaction) => {
+  if (!transaction) return '-'
+  
+  // Try different possible amount fields
+  const amount = transaction.amount || transaction.pnl || transaction.value || 0
+  
+  if (transaction.type === 'PROFIT' || transaction.type === 'LOSS') {
+    return formatCurrency(amount)
+  }
+  
+  return `${formatCurrency(amount)} ${transaction.currency || 'USD'}`
 }
 
 const getPnLClass = (value) => {
@@ -336,12 +364,6 @@ const getDayClass = (day) => {
   if (day.pnl > 0) return 'profit-day'
   if (day.pnl < 0) return 'loss-day'
   return 'neutral-day'
-}
-
-const getTransactionAmountClass = (transaction) => {
-  if (transaction.type === 'PROFIT' || transaction.type === 'DEPOSIT') return 'profit'
-  if (transaction.type === 'LOSS' || transaction.type === 'WITHDRAWAL') return 'loss'
-  return ''
 }
 
 const selectDay = (day) => {
@@ -408,7 +430,7 @@ const fetchMonthlyPerformance = async () => {
   }
 }
 
-// Fetch transactions
+// Fetch transactions - FIXED DATE OFFSET ISSUE
 const fetchTransactions = async (reset = true) => {
   if (reset) {
     currentTransactionPage.value = 0
@@ -431,10 +453,13 @@ const fetchTransactions = async (reset = true) => {
     if (transactionFilter.currency) payload.currency = transactionFilter.currency
     if (transactionFilter.symbol) payload.symbol = transactionFilter.symbol
     
-    // Add date filter if day is selected
-    if (selectedDay.value) {
-      const date = new Date(calendarData.value.year, calendarData.value.month - 1, selectedDay.value.day)
-      payload.date = date.toISOString().split('T')[0]
+    // FIX: Add date filter with correct day (no timezone offset)
+    if (selectedDay.value && calendarData.value) {
+      // Format date as YYYY-MM-DD without timezone issues
+      const year = calendarData.value.year
+      const month = String(calendarData.value.month).padStart(2, '0')
+      const day = String(selectedDay.value.day).padStart(2, '0')
+      payload.date = `${year}-${month}-${day}`
     }
     
     const response = await fetch(`${API_BASE_URL}/fetch`, {
