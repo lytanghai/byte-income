@@ -4,7 +4,8 @@
     <div class="header-actions">
       <h1>Configuration Management</h1>
       <button class="btn btn-primary" @click="openCreateModal">
-        <span class="btn-icon">+</span> Add New Configuration
+        <span class="btn-icon">+</span> 
+        <span class="btn-text">Add New Configuration</span>
       </button>
     </div>
 
@@ -20,12 +21,6 @@
           @input="filterConfigs"
         />
       </div>
-      <!-- <select v-model="itemsPerPage" class="items-per-page" @change="fetchConfigs">
-        <option value="5">5 per page</option>
-        <option value="10">10 per page</option>
-        <option value="20">20 per page</option>
-        <option value="50">50 per page</option>
-      </select> -->
     </div>
 
     <!-- Loading state -->
@@ -42,7 +37,67 @@
 
     <!-- Configurations table -->
     <div v-else class="table-container">
-      <table class="configs-table">
+      <!-- Mobile cards view -->
+      <div class="mobile-cards">
+        <div v-if="filteredConfigs.length === 0" class="no-data">No configurations found</div>
+        <div v-for="config in paginatedConfigs" :key="config.id" class="config-card">
+          <div class="card-header">
+            <div class="config-info">
+              <div class="config-icon">⚙️</div>
+              <div class="config-details">
+                <span class="config-name">{{ config.name }}</span>
+                <span class="config-id">ID: {{ config.id }}</span>
+              </div>
+            </div>
+            <span class="status-badge" :class="config.status ? 'active' : 'inactive'">
+              {{ config.status ? 'Active' : 'Inactive' }}
+            </span>
+          </div>
+          
+          <div class="card-value">
+            <div class="value-wrapper">
+              <span class="value-label">Value:</span>
+              <div class="value-content">
+                <span class="value-text">
+                  {{ isValueVisible[config.id] ? config.value : maskValue(config.value) }}
+                </span>
+                <button 
+                  class="eye-toggle" 
+                  @click="toggleValueVisibility(config.id)"
+                  :title="isValueVisible[config.id] ? 'Hide value' : 'Show value'"
+                >
+                  {{ isValueVisible[config.id] ? '👁️' : '👁️‍🗨️' }}
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="card-dates">
+            <div class="date-item">
+              <span class="date-label">Created:</span>
+              <span class="date-value">{{ formatDate(config.created_at) }}</span>
+            </div>
+            <div class="date-item">
+              <span class="date-label">Updated:</span>
+              <span class="date-value">{{ formatDate(config.last_updated_at) }}</span>
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <button class="action-btn edit" @click="openEditModal(config)" title="Edit">
+              <span class="action-icon">✏️</span>
+              <span class="action-text">Edit</span>
+            </button>
+            <button class="action-btn delete" @click="confirmDelete(config)" title="Delete">
+              <span class="action-icon">🗑️</span>
+              <span class="action-text">Delete</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desktop table view -->
+      <table class="configs-table desktop-only">
         <thead>
           <tr>
             <th>ID</th>
@@ -106,7 +161,8 @@
           :disabled="currentPage === 0"
           class="pagination-btn"
         >
-          ← Previous
+          <span class="pagination-icon">←</span>
+          <span class="pagination-text">Previous</span>
         </button>
         <span class="page-info">
           Page {{ currentPage + 1 }} of {{ totalPages }}
@@ -116,7 +172,8 @@
           :disabled="currentPage >= totalPages - 1"
           class="pagination-btn"
         >
-          Next →
+          <span class="pagination-text">Next</span>
+          <span class="pagination-icon">→</span>
         </button>
       </div>
     </div>
@@ -129,6 +186,10 @@
           <button class="close-btn" @click="closeModal">✕</button>
         </div>
         
+        <div class="modal-subheader" v-if="modalMode === 'edit' && selectedConfig">
+          <span class="subheader-text">Editing: <strong>{{ selectedConfig.name }}</strong></span>
+        </div>
+
         <form @submit.prevent="handleConfigSubmit" class="modal-form">
           <div class="form-group">
             <label for="name">Name *</label>
@@ -138,9 +199,9 @@
               v-model="configForm.name" 
               required
               :disabled="modalMode === 'edit'"
-              placeholder="Enter configuration name (e.g., MAX_LOGIN_ATTEMPTS)"
+              placeholder="e.g., MAX_LOGIN_ATTEMPTS"
             />
-            <small class="hint">Configuration name should be in uppercase with underscores</small>
+            <small class="hint">Use uppercase with underscores</small>
           </div>
 
           <div class="form-group">
@@ -178,7 +239,7 @@
             </button>
             <button type="submit" class="btn btn-primary" :disabled="submitting">
               <span v-if="submitting" class="spinner-small"></span>
-              {{ submitting ? 'Saving...' : (modalMode === 'create' ? 'Create Configuration' : 'Update Configuration') }}
+              {{ submitting ? 'Saving...' : (modalMode === 'create' ? 'Create' : 'Update') }}
             </button>
           </div>
         </form>
@@ -205,7 +266,7 @@
           </button>
           <button type="button" class="btn btn-danger" @click="handleDelete" :disabled="submitting">
             <span v-if="submitting" class="spinner-small"></span>
-            {{ submitting ? 'Deleting...' : 'Delete Configuration' }}
+            {{ submitting ? 'Deleting...' : 'Delete' }}
           </button>
         </div>
       </div>
@@ -270,7 +331,8 @@ const paginatedConfigs = computed(() => {
 // Helper Methods
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A'
-  return new Date(dateString).toLocaleDateString('en-US', {
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -557,14 +619,74 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* Global reset */
 .configuration-management {
-  padding: clamp(12px, 3vw, 20px);
-  max-width: 1400px;
-  margin: 0 auto;
+  --max-width: 1400px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 20px;
+  --spacing-xl: 24px;
+  
   width: 100%;
+  max-width: 100%;
+  min-height: 100%;
+  padding: clamp(12px, 3vw, 20px);
+  margin: 0 auto;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Ensure all elements use border-box */
+.configuration-management *,
+.configuration-management *::before,
+.configuration-management *::after {
   box-sizing: border-box;
 }
 
+/* Remove default button styles */
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  transform: scale(1);
+  transition: transform 0.1s, background-color 0.2s, border-color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* Form inputs */
+input, select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border-radius: 8px;
+}
+
+/* Prevent zoom on iOS */
+@media screen and (-webkit-min-device-pixel-ratio: 0) { 
+  select,
+  textarea,
+  input {
+    font-size: 16px !important;
+  }
+}
+
+/* Responsive utilities */
+.mobile-only {
+  display: none !important;
+}
+
+.desktop-only {
+  display: table !important;
+}
+
+/* Header actions */
 .header-actions {
   display: flex;
   justify-content: space-between;
@@ -577,26 +699,45 @@ onMounted(() => {
 .header-actions h1 {
   margin: 0;
   color: var(--text-main);
-  font-size: clamp(20px, 5vw, 24px);
+  font-size: clamp(1.25rem, 5vw, 1.5rem);
+  font-weight: 600;
+  line-height: 1.2;
+  word-break: break-word;
 }
 
+/* Buttons */
 .btn {
   padding: 10px 16px;
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   white-space: nowrap;
+  height: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  box-sizing: border-box;
+  transform: scale(1);
+  line-height: 1;
+}
+
+.btn:active {
+  transform: scale(0.98);
 }
 
 .btn-icon {
-  font-size: 18px;
+  font-size: 1.125rem;
   line-height: 1;
+}
+
+.btn-text {
+  white-space: nowrap;
 }
 
 .btn-primary {
@@ -641,6 +782,7 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
+/* Search bar */
 .search-bar {
   display: flex;
   justify-content: space-between;
@@ -648,12 +790,14 @@ onMounted(() => {
   margin-bottom: clamp(16px, 4vw, 24px);
   gap: 16px;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .search-input-wrapper {
   position: relative;
   flex: 1;
   min-width: min(250px, 100%);
+  height: 44px;
 }
 
 .search-icon {
@@ -663,17 +807,27 @@ onMounted(() => {
   transform: translateY(-50%);
   color: #9ca3af;
   pointer-events: none;
+  font-size: 1rem;
+  z-index: 1;
 }
 
 .search-input {
   width: 100%;
+  height: 100%;
   padding: 12px 12px 12px 40px;
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 0.875rem;
   background: white;
   color: #1f2937;
   box-sizing: border-box;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-color: transparent;
 }
 
 .dark .search-input {
@@ -682,35 +836,22 @@ onMounted(() => {
   color: white;
 }
 
-.items-per-page {
-  padding: 8px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: white;
-  color: #1f2937;
-  cursor: pointer;
-  min-width: 120px;
-}
-
-.dark .items-per-page {
-  background: #1f2937;
-  border-color: #374151;
-  color: white;
-}
-
+/* Table container */
 .table-container {
   background: white;
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .dark .table-container {
   background: #1f2937;
 }
 
+/* Desktop table */
 .configs-table {
   width: 100%;
   border-collapse: collapse;
@@ -724,7 +865,8 @@ onMounted(() => {
   font-weight: 500;
   color: #6b7280;
   border-bottom: 1px solid #e5e7eb;
-  font-size: 14px;
+  font-size: 0.875rem;
+  white-space: nowrap;
 }
 
 .dark .configs-table th {
@@ -737,7 +879,7 @@ onMounted(() => {
   padding: 16px;
   border-bottom: 1px solid #e5e7eb;
   color: #1f2937;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .dark .configs-table td {
@@ -753,6 +895,7 @@ onMounted(() => {
   background: #111827;
 }
 
+/* Name cell */
 .name-info {
   display: flex;
   align-items: center;
@@ -774,10 +917,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 1rem;
   flex-shrink: 0;
 }
 
+/* Value cell */
 .value-cell {
   max-width: 300px;
 }
@@ -790,7 +934,7 @@ onMounted(() => {
 
 .value-text {
   font-family: monospace;
-  font-size: 13px;
+  font-size: 0.8125rem;
   word-break: break-word;
   color: #4b5563;
   flex: 1;
@@ -800,10 +944,11 @@ onMounted(() => {
   color: #9ca3af;
 }
 
+/* Eye toggle */
 .eye-toggle {
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: 1.125rem;
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
@@ -812,6 +957,14 @@ onMounted(() => {
   justify-content: center;
   opacity: 0.6;
   transition: all 0.2s;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  transform: scale(1);
+}
+
+.eye-toggle:active {
+  transform: scale(0.95);
 }
 
 .eye-toggle:hover {
@@ -823,13 +976,16 @@ onMounted(() => {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* Status badge */
 .status-badge {
   display: inline-block;
   padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: 6px;
+  font-size: 0.75rem;
   font-weight: 500;
   white-space: nowrap;
+  text-align: center;
+  min-width: 60px;
 }
 
 .status-badge.active {
@@ -852,28 +1008,37 @@ onMounted(() => {
   color: #fecaca;
 }
 
+/* Date cell */
 .date-cell {
   white-space: nowrap;
+  font-size: 0.875rem;
 }
 
+/* Actions cell */
 .actions-cell {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
+/* Action buttons */
 .action-btn {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 1rem;
   transition: all 0.2s;
   flex-shrink: 0;
+  transform: scale(1);
+}
+
+.action-btn:active {
+  transform: scale(0.95);
 }
 
 .action-btn.edit {
@@ -904,12 +1069,170 @@ onMounted(() => {
   color: #fca5a5;
 }
 
+/* Mobile cards */
+.mobile-cards {
+  display: none;
+  padding: 16px;
+  gap: 16px;
+  flex-direction: column;
+}
+
+.config-card {
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s;
+}
+
+.config-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.dark .config-card {
+  background: #374151;
+  border-color: #4b5563;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.config-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.config-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.config-details .config-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #1f2937;
+  word-break: break-word;
+}
+
+.dark .config-details .config-name {
+  color: white;
+}
+
+.config-details .config-id {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.dark .config-details .config-id {
+  color: #9ca3af;
+}
+
+.card-value {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+}
+
+.dark .card-value {
+  background: #1f2937;
+}
+
+.value-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-right: 8px;
+  font-weight: 500;
+}
+
+.dark .value-label {
+  color: #9ca3af;
+}
+
+.value-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.card-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+}
+
+.dark .card-dates {
+  background: #1f2937;
+}
+
+.date-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.date-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.dark .date-label {
+  color: #9ca3af;
+}
+
+.date-value {
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.dark .date-value {
+  color: #e5e7eb;
+}
+
+.card-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.card-actions .action-btn {
+  flex: 1;
+  width: auto;
+  height: 44px;
+  gap: 8px;
+  font-size: 0.875rem;
+}
+
+.action-text {
+  display: inline-block;
+}
+
+/* No data */
 .no-data {
   text-align: center;
   padding: 48px;
   color: #6b7280;
+  font-size: 0.875rem;
+  width: 100%;
 }
 
+/* Pagination */
 .pagination {
   display: flex;
   justify-content: center;
@@ -927,13 +1250,23 @@ onMounted(() => {
 .pagination-btn {
   padding: 8px 16px;
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border-radius: 8px;
   background: white;
   color: #374151;
   cursor: pointer;
   transition: all 0.2s;
-  font-size: 14px;
-  min-width: 80px;
+  font-size: 0.875rem;
+  min-width: 90px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transform: scale(1);
+}
+
+.pagination-btn:active {
+  transform: scale(0.97);
 }
 
 .dark .pagination-btn {
@@ -953,11 +1286,21 @@ onMounted(() => {
 .pagination-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: scale(1);
+}
+
+.pagination-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.pagination-text {
+  white-space: nowrap;
 }
 
 .page-info {
   color: #6b7280;
-  font-size: 14px;
+  font-size: 0.875rem;
   white-space: nowrap;
 }
 
@@ -979,16 +1322,18 @@ onMounted(() => {
   z-index: 1000;
   padding: 16px;
   box-sizing: border-box;
+  backdrop-filter: blur(4px);
 }
 
 .modal-content {
   background: white;
-  border-radius: 8px;
+  border-radius: 12px;
   width: 100%;
   max-width: 500px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+  position: relative;
 }
 
 .dark .modal-content {
@@ -999,12 +1344,13 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px;
+  padding: 20px 24px;
   border-bottom: 1px solid #e5e7eb;
   position: sticky;
   top: 0;
   background: inherit;
-  border-radius: 8px 8px 0 0;
+  border-radius: 12px 12px 0 0;
+  z-index: 1;
 }
 
 .dark .modal-header {
@@ -1013,27 +1359,57 @@ onMounted(() => {
 
 .modal-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.125rem;
   color: #1f2937;
   word-break: break-word;
   padding-right: 16px;
+  font-weight: 600;
 }
 
 .dark .modal-header h2 {
   color: white;
 }
 
+.modal-subheader {
+  padding: 12px 24px;
+  background: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dark .modal-subheader {
+  background: #374151;
+  border-bottom-color: #4b5563;
+}
+
+.subheader-text {
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.dark .subheader-text {
+  color: #e5e7eb;
+}
+
 .close-btn {
   background: none;
   border: none;
-  font-size: 20px;
+  font-size: 1.25rem;
   cursor: pointer;
   color: #6b7280;
-  padding: 4px 8px;
+  padding: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  transform: scale(1);
+}
+
+.close-btn:active {
+  transform: scale(0.95);
+  background: #f3f4f6;
 }
 
 .close-btn:hover {
@@ -1046,14 +1422,15 @@ onMounted(() => {
 
 .dark .close-btn:hover {
   color: #e5e7eb;
+  background: #374151;
 }
 
 .modal-form {
-  padding: 20px;
+  padding: 24px;
 }
 
 .form-group {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .form-group label {
@@ -1061,7 +1438,7 @@ onMounted(() => {
   margin-bottom: 8px;
   font-weight: 500;
   color: #374151;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .dark .form-group label {
@@ -1071,11 +1448,20 @@ onMounted(() => {
 .form-group input,
 .form-group select {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 0.875rem;
   box-sizing: border-box;
+  transition: all 0.2s;
+  height: 44px;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-color: transparent;
 }
 
 .dark .form-group input,
@@ -1101,7 +1487,7 @@ onMounted(() => {
 }
 
 .password-input-wrapper input {
-  padding-right: 40px;
+  padding-right: 48px;
 }
 
 .password-toggle {
@@ -1109,12 +1495,22 @@ onMounted(() => {
   right: 8px;
   background: none;
   border: none;
-  font-size: 18px;
+  font-size: 1.125rem;
   cursor: pointer;
-  padding: 4px;
+  padding: 8px;
   border-radius: 4px;
   opacity: 0.6;
   transition: all 0.2s;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: scale(1);
+}
+
+.password-toggle:active {
+  transform: scale(0.95);
 }
 
 .password-toggle:hover {
@@ -1132,8 +1528,8 @@ onMounted(() => {
 
 .hint {
   display: block;
-  margin-top: 4px;
-  font-size: 12px;
+  margin-top: 6px;
+  font-size: 0.75rem;
   color: #6b7280;
 }
 
@@ -1142,15 +1538,68 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  padding: 20px;
+  padding: 20px 24px;
   border-top: 1px solid #e5e7eb;
   background: #f9fafb;
-  border-radius: 0 0 8px 8px;
+  border-radius: 0 0 12px 12px;
+  position: sticky;
+  bottom: 0;
 }
 
 .dark .form-actions {
   border-top-color: #374151;
   background: #111827;
+}
+
+/* Delete modal specific */
+.confirm-delete {
+  max-width: 400px;
+}
+
+.delete-content {
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.delete-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  line-height: 1;
+}
+
+.delete-message {
+  margin: 0 0 8px;
+  color: #374151;
+  font-size: 1rem;
+  word-break: break-word;
+}
+
+.dark .delete-message {
+  color: #e5e7eb;
+}
+
+.warning {
+  color: #ef4444 !important;
+  font-size: 0.875rem !important;
+  margin: 0 !important;
+  font-weight: 500;
+}
+
+/* Loading state */
+.loading-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #6b7280;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto 16px;
+  border: 3px solid #f3f4f6;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 /* Small spinner for buttons */
@@ -1175,69 +1624,54 @@ onMounted(() => {
   to { transform: rotate(360deg); }
 }
 
-/* Delete modal specific styles */
-.confirm-delete {
-  max-width: 400px;
-}
-
-.delete-content {
-  padding: 32px 24px;
-  text-align: center;
-}
-
-.delete-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  line-height: 1;
-}
-
-.delete-message {
-  margin: 0 0 8px;
-  color: #374151;
-  font-size: 16px;
-  word-break: break-word;
-}
-
-.dark .delete-message {
-  color: #e5e7eb;
-}
-
-.warning {
-  color: #ef4444 !important;
-  font-size: 14px !important;
-  margin: 0 !important;
-}
-
-/* Loading state */
-.loading-state {
-  text-align: center;
-  padding: 48px;
-  color: #6b7280;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  margin: 0 auto 16px;
-  border: 3px solid #f3f4f6;
-  border-top-color: #3b82f6;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
 /* Error state */
 .error-state {
   text-align: center;
-  padding: 48px;
+  padding: 60px 20px;
 }
 
 .error-message {
   color: #ef4444;
   margin-bottom: 16px;
+  font-size: 0.875rem;
+  word-break: break-word;
 }
 
-/* Responsive */
+/* Firefox select arrow fix */
+@-moz-document url-prefix() {
+  select {
+    text-indent: 0.01px;
+    text-overflow: '';
+    padding-right: 32px;
+  }
+}
+
+/* IE select arrow fix */
+select::-ms-expand {
+  display: none;
+}
+
+/* Tablet styles */
+@media (max-width: 992px) {
+  .configs-table {
+    min-width: 850px;
+  }
+  
+  .name-text {
+    max-width: 150px;
+  }
+}
+
+/* Mobile styles */
 @media (max-width: 768px) {
+  .desktop-only {
+    display: none !important;
+  }
+  
+  .mobile-cards {
+    display: flex;
+  }
+
   .configuration-management {
     padding: 12px;
   }
@@ -1253,7 +1687,15 @@ onMounted(() => {
 
   .btn {
     width: 100%;
-    justify-content: center;
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    font-size: 1rem;
+    padding: 0 20px;
+  }
+
+  .btn-icon {
+    font-size: 1.25rem;
   }
 
   .search-bar {
@@ -1262,178 +1704,538 @@ onMounted(() => {
 
   .search-input-wrapper {
     width: 100%;
+    height: 48px;
   }
 
-  .items-per-page {
-    width: 100%;
-  }
-
-  .modal-content {
-    margin: 0;
-  }
-
-  .configs-table {
-    font-size: 14px;
-  }
-
-  .configs-table td {
-    padding: 12px 8px;
-  }
-
-  .name-info {
-    gap: 8px;
-  }
-
-  .config-icon {
-    width: 24px;
-    height: 24px;
-    font-size: 14px;
-  }
-
-  .name-text {
-    max-width: 150px;
-  }
-
-  .value-wrapper {
-    gap: 4px;
-  }
-
-  .value-text {
-    max-width: 120px;
-    font-size: 12px;
-  }
-
-  .actions-cell {
-    flex-wrap: nowrap;
-  }
-
-  .action-btn {
-    width: 28px;
-    height: 28px;
-    font-size: 14px;
-  }
-}
-
-@media (max-width: 480px) {
-  .configs-table {
-    min-width: 750px;
-  }
-
-  .configs-table td {
-    padding: 8px 4px;
-  }
-
-  .name-text {
-    max-width: 120px;
-    font-size: 12px;
-  }
-
-  .value-text {
-    max-width: 100px;
-    font-size: 11px;
-  }
-
-  .date-cell {
-    font-size: 11px;
-  }
-
-  .eye-toggle {
+  .search-input {
     font-size: 16px;
+    padding: 14px 14px 14px 42px;
   }
 
-  .form-actions {
-    flex-direction: column;
+  .search-icon {
+    left: 14px;
+    font-size: 1.1rem;
+  }
+
+  .table-container {
+    border-radius: 8px;
+  }
+
+  .config-card {
     padding: 16px;
   }
 
-  .form-actions .btn {
-    width: 100%;
-    margin: 0;
-    justify-content: center;
+  .config-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+  }
+
+  .card-header {
+    margin-bottom: 12px;
+  }
+
+  .config-details .config-name {
+    font-size: 1rem;
+  }
+
+  .config-details .config-id {
+    font-size: 0.75rem;
+  }
+
+  .card-value {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .value-label {
+    font-size: 0.75rem;
+  }
+
+  .value-content {
+    font-size: 0.9375rem;
+  }
+
+  .card-dates {
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+
+  .date-item {
+    font-size: 0.875rem;
+  }
+
+  .card-actions {
+    gap: 8px;
+  }
+
+  .card-actions .action-btn {
+    height: 48px;
+    font-size: 0.875rem;
+  }
+
+  .action-text {
+    display: inline-block;
+  }
+
+  .eye-toggle {
+    width: 32px;
+    height: 32px;
+    font-size: 1.25rem;
   }
 
   .pagination {
+    padding: 16px;
     gap: 8px;
   }
 
   .pagination-btn {
-    padding: 8px 12px;
-    min-width: 70px;
-    font-size: 12px;
+    min-width: 80px;
+    height: 44px;
+    padding: 0 12px;
+    font-size: 0.875rem;
+  }
+
+  .pagination-icon {
+    font-size: 1rem;
   }
 
   .page-info {
-    font-size: 12px;
+    font-size: 0.875rem;
+  }
+
+  /* Modal styles mobile */
+  .modal-content {
+    max-width: 100%;
+    margin: 0;
+    border-radius: 8px;
+  }
+
+  .modal-header {
+    padding: 16px 20px;
+  }
+
+  .modal-header h2 {
+    font-size: 1rem;
+  }
+
+  .modal-subheader {
+    padding: 10px 20px;
+  }
+
+  .modal-form {
+    padding: 20px;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-group input,
+  .form-group select {
+    height: 48px;
+    font-size: 16px;
+  }
+
+  .password-toggle {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+  }
+
+  .form-actions {
+    padding: 16px 20px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .form-actions .btn {
+    width: 100%;
+    margin: 0;
+    height: 48px;
   }
 
   .delete-content {
-    padding: 24px 16px;
+    padding: 24px 20px;
   }
 
   .delete-icon {
-    font-size: 40px;
+    font-size: 2.5rem;
   }
 
   .delete-message {
-    font-size: 15px;
+    font-size: 1rem;
+  }
+
+  .warning {
+    font-size: 0.875rem;
+  }
+
+  .close-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
   }
 }
 
-/* Touch-friendly improvements */
-@media (hover: none) and (pointer: coarse) {
-  .action-btn {
-    width: 40px;
+/* Small mobile styles */
+@media (max-width: 480px) {
+  .config-card {
+    padding: 12px;
+  }
+
+  .config-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+  }
+
+  .config-details .config-name {
+    font-size: 0.9375rem;
+  }
+
+  .config-details .config-id {
+    font-size: 0.6875rem;
+  }
+
+  .status-badge {
+    min-width: 55px;
+    padding: 3px 6px;
+    font-size: 0.6875rem;
+  }
+
+  .card-value {
+    padding: 10px;
+  }
+
+  .value-label {
+    font-size: 0.6875rem;
+  }
+
+  .value-content {
+    font-size: 0.875rem;
+  }
+
+  .card-dates {
+    padding: 10px;
+  }
+
+  .date-item {
+    font-size: 0.8125rem;
+  }
+
+  .date-label {
+    font-size: 0.75rem;
+  }
+
+  .date-value {
+    font-size: 0.75rem;
+  }
+
+  .card-actions .action-btn {
+    height: 44px;
+    font-size: 0.8125rem;
+  }
+
+  .eye-toggle {
+    width: 28px;
+    height: 28px;
+    font-size: 1rem;
+  }
+
+  .pagination-btn {
+    min-width: 70px;
+    height: 40px;
+    font-size: 0.8125rem;
+  }
+
+  .pagination-icon {
+    font-size: 0.875rem;
+  }
+
+  .page-info {
+    font-size: 0.8125rem;
+  }
+
+  .loading-state {
+    padding: 40px 16px;
+  }
+
+  .error-state {
+    padding: 40px 16px;
+  }
+
+  .no-data {
+    padding: 32px 16px;
+  }
+}
+
+/* Extra small mobile styles */
+@media (max-width: 360px) {
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .status-badge {
+    align-self: flex-start;
+  }
+
+  .card-actions {
+    flex-direction: column;
+  }
+
+  .card-actions .action-btn {
+    width: 100%;
+  }
+
+  .value-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .eye-toggle {
+    align-self: flex-end;
+  }
+
+  .pagination {
+    gap: 4px;
+  }
+
+  .pagination-btn {
+    min-width: 60px;
+    padding: 0 8px;
+  }
+
+  .pagination-text {
+    display: none;
+  }
+
+  .pagination-icon {
+    display: block;
+    font-size: 1rem;
+  }
+}
+
+/* Landscape mode */
+@media (max-width: 768px) and (orientation: landscape) {
+  .modal-content {
+    max-height: 85vh;
+  }
+
+  .modal-form {
+    padding: 16px;
+  }
+
+  .form-group {
+    margin-bottom: 12px;
+  }
+
+  .form-group input,
+  .form-group select {
     height: 40px;
   }
-  
-  .pagination-btn {
-    padding: 12px 20px;
+
+  .form-actions {
+    padding: 12px 16px;
   }
-  
-  .close-btn {
-    padding: 8px 12px;
-  }
-  
-  .btn {
-    padding: 12px 20px;
-  }
-  
+
   .form-actions .btn {
-    padding: 14px 20px;
+    height: 40px;
   }
-  
+
+  .delete-content {
+    padding: 20px 16px;
+  }
+
+  .card-actions {
+    flex-direction: row;
+  }
+
+  .card-actions .action-btn {
+    width: auto;
+    flex: 1;
+  }
+}
+
+/* Touch device improvements */
+@media (hover: none) and (pointer: coarse) {
+  .action-btn,
+  .pagination-btn,
+  .btn,
+  .close-btn,
+  .eye-toggle,
+  .password-toggle {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .action-btn {
+    min-width: 44px;
+  }
+
+  .card-actions .action-btn {
+    min-height: 48px;
+  }
+
   .eye-toggle,
   .password-toggle {
     padding: 8px;
-    font-size: 20px;
   }
-  
+
   input, select {
     font-size: 16px !important;
   }
 }
 
-/* Print styles */
-@media print {
-  .btn,
-  .search-bar,
-  .actions-cell,
-  .pagination,
-  .modal-overlay,
-  .eye-toggle {
-    display: none;
+/* Focus styles for accessibility */
+.btn:focus-visible,
+.action-btn:focus-visible,
+.pagination-btn:focus-visible,
+.close-btn:focus-visible,
+.search-input:focus-visible,
+.eye-toggle:focus-visible,
+.password-toggle:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.btn:focus:not(:focus-visible),
+.action-btn:focus:not(:focus-visible),
+.pagination-btn:focus:not(:focus-visible),
+.close-btn:focus:not(:focus-visible),
+.search-input:focus:not(:focus-visible),
+.eye-toggle:focus:not(:focus-visible),
+.password-toggle:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* High refresh rate displays */
+@media (min-width: 1920px) {
+  .configuration-management {
+    padding: 24px;
+    max-width: 1600px;
   }
-  
-  .table-container {
-    box-shadow: none;
+
+  .btn {
+    height: 44px;
+    min-height: 44px;
+    max-height: 44px;
+    font-size: 1rem;
   }
-  
-  .configs-table {
-    min-width: auto;
+
+  .configs-table th,
+  .configs-table td {
+    padding: 20px;
+    font-size: 1rem;
   }
-  
+
+  .config-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+  }
+
+  .name-text {
+    font-size: 1rem;
+    max-width: 250px;
+  }
+
   .value-text {
-    color: black !important;
+    font-size: 0.9375rem;
+  }
+
+  .status-badge {
+    padding: 6px 12px;
+    font-size: 0.875rem;
+    min-width: 70px;
+  }
+
+  .date-cell {
+    font-size: 0.9375rem;
+  }
+
+  .action-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 1.125rem;
+  }
+
+  .pagination-btn {
+    height: 44px;
+    font-size: 1rem;
+    min-width: 100px;
+  }
+}
+
+/* Dark mode adjustments */
+.dark .config-card {
+  background: #374151;
+  border-color: #4b5563;
+}
+
+.dark .card-value,
+.dark .card-dates {
+  background: #1f2937;
+}
+
+.dark .date-label,
+.dark .value-label {
+  color: #9ca3af;
+}
+
+.dark .date-value,
+.dark .value-text {
+  color: #e5e7eb;
+}
+
+.dark .modal-content {
+  background: #1f2937;
+}
+
+.dark .modal-subheader {
+  background: #374151;
+  border-bottom-color: #4b5563;
+}
+
+.dark .subheader-text {
+  color: #e5e7eb;
+}
+
+.dark .close-btn:hover {
+  background: #374151;
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .action-btn,
+  .pagination-btn,
+  .close-btn,
+  .eye-toggle,
+  .password-toggle,
+  .config-card,
+  .spinner,
+  .spinner-small,
+  .modal-overlay {
+    transition: none;
+    animation: none;
+  }
+  
+  .btn:active,
+  .action-btn:active,
+  .pagination-btn:active,
+  .close-btn:active,
+  .eye-toggle:active,
+  .password-toggle:active {
+    transform: none;
+  }
+  
+  .spinner,
+  .spinner-small {
+    animation: none;
   }
 }
 </style>
