@@ -22,7 +22,7 @@
             <path d="M13 16C11.3431 16 10 14.6569 10 13C10 11.3431 11.3431 10 13 10H19C20.6569 10 22 11.3431 22 13C22 14.6569 20.6569 16 19 16H13Z" fill="currentColor"/>
           </svg>
         </div>
-        <h1 class="login-title">Sign in to Your Workspace</h1>
+        <h1 class="login-title">Sign in to Portal Management</h1>
         <p class="login-subtitle">Enter your credentials to access your account</p>
       </div>
 

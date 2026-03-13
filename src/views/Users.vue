@@ -374,7 +374,7 @@ const fetchUsers = async (page = currentPage.value) => {
       throw new Error('No authentication token found')
     }
 
-    const response = await fetch(`${API_BASE_URL}/user/listing`, {
+    const response = await fetch(`${API_BASE_URL}/auth/user/listing`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -414,7 +414,7 @@ const registerUser = async (userData) => {
   try {
     const token = getAuthToken()
     
-    const response = await fetch(`${API_BASE_URL}/register`, {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -443,7 +443,7 @@ const changePassword = async (username, passwordData) => {
   try {
     const token = getAuthToken()
     
-    const response = await fetch(`${API_BASE_URL}/change-password`, {
+    const response = await fetch(`${API_BASE_URL}/auth/change-password`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -475,7 +475,7 @@ const deleteUser = async (id) => {
   try {
     const token = getAuthToken()
 
-    const response = await fetch(`${API_BASE_URL}/user/delete`, {
+    const response = await fetch(`${API_BASE_URL}/auth/user/delete`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

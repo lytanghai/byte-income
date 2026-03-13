@@ -465,7 +465,7 @@ const fetchMonthlyPerformance = async () => {
   try {
     const token = getAuthToken()
     
-    const response = await fetch(`${API_BASE_URL}/monthly/performance`, {
+    const response = await fetch(`${API_BASE_URL}/transaction/monthly/performance`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -529,7 +529,7 @@ const fetchTransactions = async (reset = true) => {
       payload.date = `${year}-${month}-${day}`
     }
     
-    const response = await fetch(`${API_BASE_URL}/fetch`, {
+    const response = await fetch(`${API_BASE_URL}/transaction/fetch`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

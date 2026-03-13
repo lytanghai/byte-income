@@ -385,7 +385,7 @@ const fetchConfigs = async (page = currentPage.value) => {
       throw new Error('No authentication token found')
     }
 
-    const response = await fetch(`${API_BASE_URL}/list`, {
+    const response = await fetch(`${API_BASE_URL}/config/list`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
