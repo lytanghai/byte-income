@@ -88,7 +88,7 @@
             @click="selectDay(day)"
           >
             <span class="day-number">{{ day.day }}</span>
-            <span class="day-pnl">{{ formatPnL(day.pnl) }}</span>
+            <span class="day-pnl">{{ day.pnl }}</span>
           </div>
         </div>
 
@@ -230,6 +230,13 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useNotification } from '../composables/useNotification'
+import { useCache } from '../composables/useCache'
+
+const { setCache, getCache } = useCache()
+
+const saveCacheData = (cacheName, data) => {
+  setCache(cacheName, data, 5) // Expires in 5 minutes
+}
 
 // Initialize notification
 const notification = useNotification()
@@ -308,8 +315,8 @@ const saveCalendarToCache = (data) => {
       month: selectedMonth.value,
       year: selectedYear.value
     }
-    localStorage.setItem(CALENDAR_CACHE_KEY, JSON.stringify(cacheData))
-    localStorage.setItem(CALENDAR_TIMESTAMP_KEY, new Date().toISOString())
+    saveCacheData(CALENDAR_CACHE_KEY, JSON.stringify(cacheData), 10)
+    saveCacheData(CALENDAR_TIMESTAMP_KEY, new Date().toISOString(), 10)
     console.log('✅ Calendar data saved to cache')
   } catch (err) {
     console.error('Failed to save calendar to cache:', err)
@@ -318,8 +325,9 @@ const saveCalendarToCache = (data) => {
 
 const loadCalendarFromCache = () => {
   try {
-    const cached = localStorage.getItem(CALENDAR_CACHE_KEY)
-    const timestamp = localStorage.getItem(CALENDAR_TIMESTAMP_KEY)
+    const cached = getCache(CALENDAR_CACHE_KEY)
+    console.log("data " + cached)
+    const timestamp = getCache(CALENDAR_TIMESTAMP_KEY)
     
     if (cached && timestamp) {
       const cacheData = JSON.parse(cached)
@@ -351,8 +359,8 @@ const saveTransactionsToCache = (data) => {
         symbol: transactionFilter.symbol
       }
     }
-    localStorage.setItem(cacheKey, JSON.stringify(cacheData))
-    localStorage.setItem(TRANSACTIONS_TIMESTAMP_KEY, new Date().toISOString())
+    saveCacheData(cacheKey, JSON.stringify(cacheData) ,10)
+    saveCacheData(TRANSACTIONS_TIMESTAMP_KEY, new Date().toISOString() ,10)
     console.log('✅ Transactions saved to cache')
   } catch (err) {
     console.error('Failed to save transactions to cache:', err)
@@ -362,7 +370,7 @@ const saveTransactionsToCache = (data) => {
 const loadTransactionsFromCache = () => {
   try {
     const cacheKey = `${TRANSACTIONS_CACHE_KEY}_${selectedMonth.value}_${selectedYear.value}${selectedDay.value ? '_' + selectedDay.value.day : ''}`
-    const cached = localStorage.getItem(cacheKey)
+    const cached = getCache(cacheKey)
     
     if (cached) {
       const cacheData = JSON.parse(cached)
@@ -489,6 +497,7 @@ const getAmountClass = (transaction) => {
 const formatTransactionAmount = (transaction) => {
   if (!transaction) return '-'
   
+  // Try different possible amount fields
   const amount = transaction.amount || transaction.pnl || transaction.value || 0
   
   if (transaction.type === 'PROFIT' || transaction.type === 'LOSS') {
@@ -578,9 +587,11 @@ const fetchMonthlyPerformance = async (forceRefresh = false) => {
     })
     
     const data = await response.json()
+    console.log('📅 Calendar API response:', data)
     
     if (data.code === '200') {
       calendarData.value = data.data
+      console.log('📅 Calendar days:', data.data.days)
       saveCalendarToCache(data.data)
       selectedDay.value = null
       fetchTransactions(true)
@@ -1855,7 +1866,7 @@ select::-ms-expand {
   }
 
   /* Month/Year selects - with improved spacing */
-month-select,
+.month-select,
   .year-select {
     min-width: 0;
     flex: 1;

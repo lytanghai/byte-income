@@ -391,7 +391,13 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useNotification } from '../composables/useNotification'
+import { useCache } from '../composables/useCache'
 
+const { setCache, getCache } = useCache()
+
+const saveCacheData = (cacheName, data) => {
+  setCache(cacheName, data, 5) // Expires in 5 minutes
+}
 // Initialize notification
 const notification = useNotification()
 
@@ -496,9 +502,11 @@ const getAuthToken = () => {
 // ============== CACHE MANAGEMENT ==============
 const saveToCache = (data) => {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data))
+
+    saveCacheData(CACHE_KEY, JSON.stringify(data), 5)
+  
     const timestamp = new Date().toISOString()
-    localStorage.setItem(CACHE_TIMESTAMP_KEY, timestamp)
+    saveCacheData(CACHE_TIMESTAMP_KEY, timestamp, 5)
     lastUpdated.value = timestamp
     cacheStatus.value = { type: 'cached', text: 'Cached data' }
     console.log('✅ Data saved to cache:', data.length, 'transactions')
@@ -509,8 +517,8 @@ const saveToCache = (data) => {
 
 const loadFromCache = () => {
   try {
-    const cached = localStorage.getItem(CACHE_KEY)
-    const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
+    const cached = getCache(CACHE_KEY)
+    const timestamp = getCache(CACHE_TIMESTAMP_KEY)
     
     if (cached && timestamp) {
       const data = JSON.parse(cached)
@@ -798,10 +806,10 @@ const formatTransactionAmount = (transaction) => {
   const amount = transaction.pnl || 0
   
   if (transaction.type === 'PROFIT' || transaction.type === 'LOSS') {
-    return formatCurrency(amount)
+    return amount
   }
   
-  return `${formatCurrency(amount)} ${transaction.currency}`
+  return `${amount}`
 }
 
 const getAmountClass = (transaction) => {
@@ -1648,7 +1656,7 @@ const handleDelete = async () => {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 20px;
+  margin: 10px;
 }
 
 /* Delete Modal */

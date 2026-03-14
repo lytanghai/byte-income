@@ -9,7 +9,7 @@ import Transaction from '../views/Transaction.vue'
 import Market from '../views/Market.vue'
 import Report from '../views/Report.vue'
 import Users from '../views/Users.vue'
-import Cron from '../views/Cron.vue'
+import Cache from '../views/Cache.vue'
 import Configuration from '../views/Configuration.vue'
 
 const routes = [
@@ -26,7 +26,7 @@ const routes = [
     children: [
       { path: '', redirect: '/overview' }, // Default route
       { path: 'overview', name: 'Overview', component: Overview },
-      { path: 'cron', name: 'Cron', component: Cron },
+      { path: 'cache', name: 'Cache', component: Cache },
       { path: 'transaction', name: 'Transaction', component: Transaction },
       { path: 'performance', name: 'Performance', component: Performance },
       { path: 'insight', name: 'Insight', component: Insight },

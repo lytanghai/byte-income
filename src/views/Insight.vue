@@ -346,7 +346,13 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useNotification } from '../composables/useNotification'
+import { useCache } from '../composables/useCache'
 
+const { setCache, getCache } = useCache()
+
+const saveCacheData = (cacheName, data) => {
+  setCache(cacheName, data, 5) // Expires in 5 minutes
+}
 // Initialize notification
 const notification = useNotification()
 
@@ -395,8 +401,8 @@ const saveNewsToCache = (data) => {
         source: filters.source
       }
     }
-    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(cacheData))
-    localStorage.setItem(NEWS_TIMESTAMP_KEY, new Date().toISOString())
+    saveCacheData(NEWS_CACHE_KEY, JSON.stringify(cacheData), 5)
+    saveCacheData(NEWS_TIMESTAMP_KEY, new Date().toISOString(), 5)
     console.log('✅ News saved to cache')
   } catch (err) {
     console.error('Failed to save news to cache:', err)
@@ -405,7 +411,7 @@ const saveNewsToCache = (data) => {
 
 const loadNewsFromCache = () => {
   try {
-    const cached = localStorage.getItem(NEWS_CACHE_KEY)
+    const cached = getCache(NEWS_CACHE_KEY)
     
     if (cached) {
       const cacheData = JSON.parse(cached)
@@ -438,8 +444,9 @@ const saveEventsToCache = (data) => {
         keyword: filters.keyword
       }
     }
-    localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify(cacheData))
-    localStorage.setItem(EVENTS_TIMESTAMP_KEY, new Date().toISOString())
+    saveCacheData(EVENTS_CACHE_KEY, JSON.stringify(cacheData), 5)
+    saveCacheData(EVENTS_TIMESTAMP_KEY, new Date().toISOString(), 5)
+
     console.log('✅ Events saved to cache')
   } catch (err) {
     console.error('Failed to save events to cache:', err)
@@ -448,7 +455,7 @@ const saveEventsToCache = (data) => {
 
 const loadEventsFromCache = () => {
   try {
-    const cached = localStorage.getItem(EVENTS_CACHE_KEY)
+    const cached = getCache(EVENTS_CACHE_KEY)
     
     if (cached) {
       const cacheData = JSON.parse(cached)
