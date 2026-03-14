@@ -54,6 +54,10 @@
                                 <!-- <span class="menu-icon">⚙️</span> -->
                                 <span class="menu-text">Configuration</span>
                             </RouterLink>
+                             <RouterLink @click="closeSidebar" to="/cron">
+                                <!-- <span class="menu-icon">⚙️</span> -->
+                                <span class="menu-text">Cron</span>
+                            </RouterLink>
                         </div>
                     </div>
                 </nav>
