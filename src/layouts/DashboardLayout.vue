@@ -304,7 +304,7 @@
 
 /* Header */
 .header {
-    height: 70px;
+    height: 55px;
     background: var(--bg-header);
     border-bottom: 1px solid #e5e7eb;
     display: flex;

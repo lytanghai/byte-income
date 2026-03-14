@@ -3,17 +3,16 @@
     <!-- Header -->
     <div class="page-header">
       <h1>Market</h1>
-      <p class="subtitle">Real-time gold price and VPS alerts</p>
+      <p class="subtitle">Real-time Gold and DXY prices</p>
     </div>
 
     <!-- Tab Navigation -->
     <div class="tab-navigation">
       <button 
         class="tab-btn" 
-        :class="{ active: activeTab === 'gold' }"
-        @click="activeTab = 'gold'"
+        :class="{ active: activeTab === 'chart' }"
+        @click="activeTab = 'chart'"
       >
-        <!-- <span class="tab-icon">🥇</span> -->
         Chart
       </button>
       <button 
@@ -27,161 +26,196 @@
       </button>
     </div>
 
-    <!-- Gold Price Tab -->
-    <div v-show="activeTab === 'gold'" class="gold-tab">
+    <!-- Chart Tab (Gold + DXY) -->
+    <div v-show="activeTab === 'chart'" class="chart-tab">
       <!-- Connection Status -->
       <div class="connection-status" :class="connectionState">
         <span class="status-indicator"></span>
         <span class="status-text">{{ connectionMessage }}</span>
         <span class="next-update">Next update in {{ countdown }}s</span>
-        <button @click="forceRefresh" class="btn-refresh" :disabled="loading">
-          <span class="refresh-icon" :class="{ 'spin': loading }">↻</span>
+        <button @click="refreshAllData" class="btn-refresh" :disabled="loading || dxyLoading">
+          <span class="refresh-icon" :class="{ 'spin': loading || dxyLoading }">↻</span>
           Refresh
         </button>
       </div>
 
-      <!-- Gold Price Card -->
-      <div class="gold-card" v-if="goldData">
-        <div class="gold-header">
-          <div class="gold-title">
-            <span class="gold-icon">🥇</span>
-            <h2>{{ goldData.name }}</h2>
-            <span class="gold-symbol">{{ goldData.symbol }}</span>
-          </div>
-          <div class="last-updated">
-            {{ formatLastUpdated(goldData.updatedAtReadable, goldData.updatedAt) }}
-          </div>
-        </div>
-
-        <div class="gold-price-container">
-          <div class="gold-price">
-            <span class="price-label">Spot Price</span>
-            <span class="price-value">{{ formatPrice(goldData.price) }}</span>
-            <span class="price-currency">USD/oz</span>
-          </div>
-
-          <!-- 30-Minute Price Change -->
-          <div class="price-change-indicator" :class="priceTrend">
-            <span class="trend-icon">{{ priceTrend === 'up' ? '▲' : priceTrend === 'down' ? '▼' : '◆' }}</span>
-            <div class="trend-details">
-              <span class="trend-text">{{ priceTrend === 'up' ? 'Rising' : priceTrend === 'down' ? 'Falling' : 'Stable' }}</span>
-              <span class="trend-change" :class="getChangeClass(calculate30MinChange)">
-                {{ formatChange(calculate30MinChange) }} ({{ formatChangePercent(calculate30MinChangePercent) }})
-              </span>
+      <!-- Two-Column Layout for Charts -->
+      <div class="charts-grid">
+        <!-- Gold Card -->
+        <div class="price-card gold-card" v-if="goldData">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-icon">🥇</span>
+              <h2>{{ goldData.name }}</h2>
+              <span class="card-symbol">{{ goldData.symbol }}</span>
+            </div>
+            <div class="last-updated">
+              {{ formatLastUpdated(goldData.updatedAtReadable, goldData.updatedAt) }}
             </div>
           </div>
-        </div>
 
-        <!-- 30-Minute Price Chart -->
-        <div class="price-chart">
-          <div class="chart-header">
-            <h3>Price Movement (Last 30 Minutes)</h3>
-            <span class="chart-interval">30 data points • 1 min intervals</span>
-          </div>
-          <div class="chart-container">
-            <!-- Y-axis labels -->
-            <div class="chart-y-axis">
-              <span>{{ formatPrice(priceStats.max) }}</span>
-              <span>{{ formatPrice(priceStats.avg) }}</span>
-              <span>{{ formatPrice(priceStats.min) }}</span>
+          <div class="price-container">
+            <div class="price-main">
+              <span class="price-label">Spot Price</span>
+              <span class="price-value">{{ formatPrice(goldData.price) }}</span>
+              <span class="price-currency">USD/oz</span>
             </div>
-            
-            <!-- Chart bars -->
-            <div class="chart-bars">
-              <div 
-                v-for="(price, index) in priceHistory" 
-                :key="index"
-                class="chart-bar-wrapper"
-              >
-                <div 
-                  class="chart-bar"
-                  :style="{ height: getBarHeight(price) + '%' }"
-                  :class="getBarClass(price)"
-                >
-                  <span class="bar-tooltip">
-                    {{ formatPrice(price) }}<br>
-                    {{ getBarTime(index) }}
-                  </span>
-                </div>
-                <span class="bar-label" v-if="index % 5 === 0">{{ index }}m</span>
+
+            <!-- 30-Minute Price Change -->
+            <div class="price-change" :class="goldTrend">
+              <span class="trend-icon">{{ goldTrend === 'up' ? '▲' : goldTrend === 'down' ? '▼' : '◆' }}</span>
+              <div class="trend-details">
+                <span class="trend-text">{{ goldTrend === 'up' ? 'Rising' : goldTrend === 'down' ? 'Falling' : 'Stable' }}</span>
+                <span class="trend-change" :class="getChangeClass(goldStats.change)">
+                  {{ formatChange(goldStats.change) }} ({{ formatChangePercent(goldStats.changePercent) }})
+                </span>
               </div>
             </div>
           </div>
+
+          <!-- Gold Price Chart -->
+          <div class="price-chart">
+            <div class="chart-header">
+              <h3>Gold (Last 30 Minutes)</h3>
+              <span class="chart-interval">30 points • 1 min intervals</span>
+            </div>
+            <div class="chart-container">
+              <div class="chart-y-axis">
+                <span>{{ formatPrice(goldStats.max) }}</span>
+                <span>{{ formatPrice(goldStats.avg) }}</span>
+                <span>{{ formatPrice(goldStats.min) }}</span>
+              </div>
+              <div class="chart-bars">
+                <div v-for="(price, index) in goldHistory" :key="index" class="chart-bar-wrapper">
+                  <div 
+                    class="chart-bar" 
+                    :style="{ height: getGoldBarHeight(price) + '%' }" 
+                    :class="getGoldBarClass(price)"
+                  >
+                    <span class="bar-tooltip">{{ formatPrice(price) }}<br>{{ getGoldBarTime(index) }}</span>
+                  </div>
+                  <span class="bar-label" v-if="index % 5 === 0">{{ index }}m</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gold Stats -->
+          <div class="price-stats">
+            <div class="stat-item">
+              <span class="stat-label">30m High</span>
+              <span class="stat-value">{{ formatPrice(goldStats.max) }}</span>
+              <span class="stat-time">{{ goldHighTime }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">30m Low</span>
+              <span class="stat-value">{{ formatPrice(goldStats.min) }}</span>
+              <span class="stat-time">{{ goldLowTime }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Change</span>
+              <span class="stat-value" :class="getChangeClass(goldStats.change)">{{ formatChange(goldStats.change) }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Change %</span>
+              <span class="stat-value" :class="getChangeClass(goldStats.changePercent)">{{ formatChangePercent(goldStats.changePercent) }}</span>
+            </div>
+          </div>
         </div>
 
-        <!-- 30-Minute Statistics -->
-        <div class="price-stats">
-          <div class="stat-card">
-            <span class="stat-label">30m High</span>
-            <span class="stat-value">{{ formatPrice(priceStats.max) }}</span>
-            <span class="stat-time">{{ getHighTime }}</span>
+        <!-- DXY Card -->
+        <div class="price-card dxy-card" v-if="dxyData">
+          <div class="card-header">
+            <div class="card-title">
+              <span class="card-icon">💵</span>
+              <h2>US Dollar Index</h2>
+              <span class="card-symbol">DXY</span>
+            </div>
+            <div class="last-updated">
+              {{ formatDxyTime(dxyData.t) }}
+            </div>
           </div>
-          <div class="stat-card">
-            <span class="stat-label">30m Low</span>
-            <span class="stat-value">{{ formatPrice(priceStats.min) }}</span>
-            <span class="stat-time">{{ getLowTime }}</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">30m Open</span>
-            <span class="stat-value">{{ formatPrice(priceStats.open) }}</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">30m Close</span>
-            <span class="stat-value">{{ formatPrice(priceStats.close) }}</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">30m Change</span>
-            <span class="stat-value" :class="getChangeClass(priceStats.change)">
-              {{ formatChange(priceStats.change) }}
-            </span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">30m Change %</span>
-            <span class="stat-value" :class="getChangeClass(priceStats.changePercent)">
-              {{ formatChangePercent(priceStats.changePercent) }}
-            </span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">30m Volatility</span>
-            <span class="stat-value">{{ priceStats.volatility.toFixed(2) }}%</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">30m Avg</span>
-            <span class="stat-value">{{ formatPrice(priceStats.avg) }}</span>
-          </div>
-        </div>
 
-        <!-- Price Alerts -->
-        <div class="price-alerts" v-if="priceAlerts.length > 0">
-          <div class="alerts-title">
-            <span class="alert-icon">⚠️</span>
-            <span>30-Minute Alerts</span>
+          <div class="price-container">
+            <div class="price-main">
+              <span class="price-label">Index Value</span>
+              <span class="price-value">{{ formatDxyPrice(dxyData.ld) }}</span>
+              <span class="price-currency">DXY</span>
+            </div>
+
+            <!-- DXY Price Change -->
+            <div class="price-change" :class="dxyTrend">
+              <span class="trend-icon">{{ dxyTrend === 'up' ? '▲' : dxyTrend === 'down' ? '▼' : '◆' }}</span>
+              <div class="trend-details">
+                <span class="trend-text">{{ dxyTrend === 'up' ? 'Rising' : dxyTrend === 'down' ? 'Falling' : 'Stable' }}</span>
+                <span class="trend-change" :class="getChangeClass(dxyStats.change)">
+                  {{ formatDxyChange(dxyStats.change) }} ({{ formatChangePercent(dxyStats.changePercent) }})
+                </span>
+              </div>
+            </div>
           </div>
-          <div class="alerts-scroll">
-            <div 
-              v-for="(alert, index) in priceAlerts" 
-              :key="index"
-              class="price-alert-item"
-              :class="alert.type"
-            >
-              <span class="alert-time">{{ alert.time }}</span>
-              <span class="alert-message">{{ alert.message }}</span>
-              <span class="alert-change" :class="alert.type">{{ alert.change }}</span>
+
+          <!-- DXY Price Chart -->
+          <div class="price-chart">
+            <div class="chart-header">
+              <h3>DXY (Last 30 Minutes)</h3>
+              <span class="chart-interval">30 points • 1 min intervals</span>
+            </div>
+            <div class="chart-container">
+              <div class="chart-y-axis">
+                <span>{{ formatDxyPrice(dxyStats.max) }}</span>
+                <span>{{ formatDxyPrice(dxyStats.avg) }}</span>
+                <span>{{ formatDxyPrice(dxyStats.min) }}</span>
+              </div>
+              <div class="chart-bars">
+                <div v-for="(price, index) in dxyHistory" :key="index" class="chart-bar-wrapper">
+                  <div 
+                    class="chart-bar" 
+                    :style="{ height: getDxyBarHeight(price) + '%' }" 
+                    :class="getDxyBarClass(price)"
+                  >
+                    <span class="bar-tooltip">{{ formatDxyPrice(price) }}<br>{{ getDxyBarTime(index) }}</span>
+                  </div>
+                  <span class="bar-label" v-if="index % 5 === 0">{{ index }}m</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DXY Stats -->
+          <div class="price-stats">
+            <div class="stat-item">
+              <span class="stat-label">30m High</span>
+              <span class="stat-value">{{ formatDxyPrice(dxyStats.max) }}</span>
+              <span class="stat-time">{{ dxyHighTime }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">30m Low</span>
+              <span class="stat-value">{{ formatDxyPrice(dxyStats.min) }}</span>
+              <span class="stat-time">{{ dxyLowTime }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Change</span>
+              <span class="stat-value" :class="getChangeClass(dxyStats.change)">{{ formatDxyChange(dxyStats.change) }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Change %</span>
+              <span class="stat-value" :class="getChangeClass(dxyStats.changePercent)">{{ formatChangePercent(dxyStats.changePercent) }}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Loading State -->
-      <div v-else-if="loading && !goldData" class="loading-state">
+      <!-- Loading States -->
+      <div v-if="(!goldData || !dxyData) && (loading || dxyLoading)" class="loading-state">
         <div class="spinner"></div>
-        <p>Fetching gold price...</p>
+        <p>Fetching market data...</p>
       </div>
 
-      <!-- Error State -->
-      <div v-else-if="error" class="error-state">
-        <p class="error-message">{{ error }}</p>
-        <button @click="fetchGoldPrice" class="btn-retry">Retry</button>
+      <!-- Error States -->
+      <div v-else-if="error || dxyError" class="error-state">
+        <p class="error-message">{{ error || dxyError }}</p>
+        <button @click="refreshAllData" class="btn-retry">Retry</button>
       </div>
     </div>
 
@@ -303,24 +337,38 @@ import { useNotification } from '../composables/useNotification'
 
 const notification = useNotification()
 
+// ============== CONFIG ==============
+const ITICK_TOKEN = import.meta.env.VITE_ITICK_TOKEN || 'your_token_here' // Get from .env file
+
 // ============== TAB STATE ==============
-const activeTab = ref('gold') // 'gold' or 'telegram'
+const activeTab = ref('chart')
 
 // ============== GOLD API ==============
-const API_URL = 'https://api.gold-api.com/price/XAU'
+const GOLD_API_URL = 'https://api.gold-api.com/price/XAU'
 
 // Gold state
 const goldData = ref(null)
 const loading = ref(false)
 const error = ref(null)
 const connectionState = ref('connected')
-const connectionMessage = ref('Connected to Gold API')
+const connectionMessage = ref('Connected')
 const countdown = ref(60)
 
-// Price history - store 30 data points (30 minutes)
-const priceHistory = ref([])
-const priceTimestamps = ref([])
-const priceAlerts = ref([])
+// Gold history
+const goldHistory = ref([])
+const goldTimestamps = ref([])
+
+// ============== DXY API ==============
+const DXY_API_URL = 'https://api.itick.org/indices/tick?region=GB&code=DXY'
+
+// DXY state
+const dxyData = ref(null)
+const dxyLoading = ref(false)
+const dxyError = ref(null)
+
+// DXY history
+const dxyHistory = ref([])
+const dxyTimestamps = ref([])
 
 let timerInterval = null
 let countdownInterval = null
@@ -390,17 +438,15 @@ const sampleAlerts = [
 // Initialize with sample alerts
 alerts.value = [...sampleAlerts]
 
-// ============== GOLD API FUNCTIONS ==============
+// ============== GOLD FUNCTIONS ==============
 const fetchGoldPrice = async () => {
   if (loading.value) return
   
   loading.value = true
   error.value = null
-  connectionState.value = 'connecting'
-  connectionMessage.value = 'Fetching gold price...'
 
   try {
-    const response = await fetch(API_URL)
+    const response = await fetch(GOLD_API_URL)
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
@@ -410,215 +456,237 @@ const fetchGoldPrice = async () => {
     
     // Store previous price with timestamp
     if (goldData.value) {
-      priceHistory.value.push(goldData.value.price)
-      priceTimestamps.value.push(new Date())
+      goldHistory.value.push(goldData.value.price)
+      goldTimestamps.value.push(new Date())
       
-      // Keep only last 30 data points (30 minutes)
-      if (priceHistory.value.length > 30) {
-        priceHistory.value.shift()
-        priceTimestamps.value.shift()
+      // Keep only last 30 data points
+      if (goldHistory.value.length > 30) {
+        goldHistory.value.shift()
+        goldTimestamps.value.shift()
       }
-      
-      // Check for significant movements
-      checkFor30MinAlerts(data.price)
     }
     
     goldData.value = data
-    
     connectionState.value = 'connected'
-    connectionMessage.value = 'Connected to Gold API'
-    
-    // Reset countdown
-    countdown.value = 60
+    connectionMessage.value = 'Connected'
     
   } catch (err) {
     error.value = err.message
     connectionState.value = 'disconnected'
-    connectionMessage.value = 'Failed to fetch gold price'
-    notification.error(`Failed to fetch gold price: ${err.message}`)
+    connectionMessage.value = 'Disconnected'
+    notification.error(`Failed to fetch gold: ${err.message}`)
   } finally {
     loading.value = false
   }
 }
 
-const forceRefresh = () => {
+// ============== DXY FUNCTIONS ==============
+const fetchDXYPrice = async () => {
+  if (dxyLoading.value) return
+  
+  dxyLoading.value = true
+  dxyError.value = null
+
+  try {
+    const response = await fetch(DXY_API_URL, {
+      headers: {
+        'accept': 'application/json',
+        'token': ITICK_TOKEN
+      }
+    })
+    
+    if (response.status === 401) {
+      throw new Error('Invalid API token. Please check your iTick token in .env file.')
+    }
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const result = await response.json()
+    
+    if (result.code === 0 && result.data) {
+      const data = result.data
+      
+      // Store previous price with timestamp
+      if (dxyData.value) {
+        dxyHistory.value.push(dxyData.value.ld)
+        dxyTimestamps.value.push(new Date(data.t))
+        
+        // Keep only last 30 data points
+        if (dxyHistory.value.length > 30) {
+          dxyHistory.value.shift()
+          dxyTimestamps.value.shift()
+        }
+      }
+      
+      dxyData.value = data
+      connectionState.value = 'connected'
+      connectionMessage.value = 'Connected'
+      
+    } else {
+      throw new Error(result.msg || 'Failed to fetch DXY data')
+    }
+    
+  } catch (err) {
+    dxyError.value = err.message
+    connectionState.value = 'disconnected'
+    connectionMessage.value = 'Disconnected'
+    notification.error(`Failed to fetch DXY: ${err.message}`)
+  } finally {
+    dxyLoading.value = false
+  }
+}
+
+const refreshAllData = () => {
   fetchGoldPrice()
+  fetchDXYPrice()
   countdown.value = 60
 }
 
-// ============== 30-MINUTE ANALYSIS ==============
-const priceStats = computed(() => {
-  if (priceHistory.value.length === 0) {
-    return {
-      max: goldData.value?.price || 0,
-      min: goldData.value?.price || 0,
-      avg: goldData.value?.price || 0,
-      open: goldData.value?.price || 0,
-      close: goldData.value?.price || 0,
-      change: 0,
-      changePercent: 0,
-      volatility: 0
+// ============== GOLD COMPUTED ==============
+const goldStats = computed(() => {
+  const prices = [...goldHistory.value, goldData.value?.price].filter(p => p)
+  if (prices.length === 0) {
+    return { 
+      max: goldData.value?.price || 0, 
+      min: goldData.value?.price || 0, 
+      avg: goldData.value?.price || 0, 
+      change: 0, 
+      changePercent: 0 
     }
   }
   
-  const prices = priceHistory.value
-  const currentPrice = goldData.value?.price || prices[prices.length - 1]
+  const max = Math.max(...prices)
+  const min = Math.min(...prices)
+  const avg = prices.reduce((a, b) => a + b, 0) / prices.length
+  const change = prices.length > 1 ? prices[prices.length - 1] - prices[0] : 0
+  const changePercent = prices[0] ? (change / prices[0]) * 100 : 0
   
-  const max = Math.max(...prices, currentPrice)
-  const min = Math.min(...prices, currentPrice)
-  const avg = [...prices, currentPrice].reduce((a, b) => a + b, 0) / (prices.length + 1)
-  const open = prices[0] || currentPrice
-  const close = currentPrice
-  const change = close - open
-  const changePercent = (change / open) * 100
-  
-  // Calculate volatility (standard deviation of returns)
-  const returns = []
-  for (let i = 1; i < prices.length; i++) {
-    returns.push((prices[i] - prices[i-1]) / prices[i-1])
-  }
-  if (prices.length > 0) {
-    returns.push((currentPrice - prices[prices.length-1]) / prices[prices.length-1])
-  }
-  
-  const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length
-  const variance = returns.reduce((a, b) => a + Math.pow(b - avgReturn, 2), 0) / returns.length
-  const volatility = Math.sqrt(variance) * 100
-  
-  return {
-    max,
-    min,
-    avg,
-    open,
-    close,
-    change,
-    changePercent,
-    volatility
-  }
+  return { max, min, avg, change, changePercent }
 })
 
-const priceTrend = computed(() => {
-  if (priceHistory.value.length < 2) return 'stable'
-  const lastTwo = [...priceHistory.value.slice(-2), goldData.value?.price].filter(p => p)
-  if (lastTwo.length < 2) return 'stable'
+const goldTrend = computed(() => {
+  if (goldHistory.value.length < 2) return 'stable'
+  const lastTwo = goldHistory.value.slice(-2)
   if (lastTwo[1] > lastTwo[0]) return 'up'
   if (lastTwo[1] < lastTwo[0]) return 'down'
   return 'stable'
 })
 
-const calculate30MinChange = computed(() => {
-  return priceStats.value.change
-})
-
-const calculate30MinChangePercent = computed(() => {
-  return priceStats.value.changePercent
-})
-
-const getHighTime = computed(() => {
+const goldHighTime = computed(() => {
   if (!goldData.value) return ''
-  const prices = [...priceHistory.value, goldData.value.price]
+  const prices = [...goldHistory.value, goldData.value.price]
   const max = Math.max(...prices)
   const index = prices.indexOf(max)
   if (index === prices.length - 1) return 'Current'
-  if (index < priceTimestamps.value.length) {
-    const time = priceTimestamps.value[index]
-    const mins = Math.floor((new Date() - time) / 60000)
+  if (index < goldTimestamps.value.length) {
+    const mins = Math.floor((new Date() - goldTimestamps.value[index]) / 60000)
     return `${mins}m ago`
   }
   return ''
 })
 
-const getLowTime = computed(() => {
+const goldLowTime = computed(() => {
   if (!goldData.value) return ''
-  const prices = [...priceHistory.value, goldData.value.price]
+  const prices = [...goldHistory.value, goldData.value.price]
   const min = Math.min(...prices)
   const index = prices.indexOf(min)
   if (index === prices.length - 1) return 'Current'
-  if (index < priceTimestamps.value.length) {
-    const time = priceTimestamps.value[index]
-    const mins = Math.floor((new Date() - time) / 60000)
+  if (index < goldTimestamps.value.length) {
+    const mins = Math.floor((new Date() - goldTimestamps.value[index]) / 60000)
     return `${mins}m ago`
   }
   return ''
 })
 
-const checkFor30MinAlerts = (newPrice) => {
-  if (priceHistory.value.length === 0) return
-  
-  const alerts = []
-  
-  // Check for 1% movement in 30 minutes
-  const thirtyMinChange = ((newPrice - priceHistory.value[0]) / priceHistory.value[0]) * 100
-  if (Math.abs(thirtyMinChange) > 1) {
-    alerts.push({
-      type: thirtyMinChange > 0 ? 'positive' : 'negative',
-      message: `30min ${thirtyMinChange > 0 ? 'gain' : 'loss'} of ${Math.abs(thirtyMinChange).toFixed(2)}%`,
-      change: `${thirtyMinChange > 0 ? '+' : ''}${thirtyMinChange.toFixed(2)}%`,
-      time: '30m'
-    })
-  }
-  
-  // Check for 0.5% movement in 5 minutes
-  if (priceHistory.value.length >= 5) {
-    const fiveMinChange = ((newPrice - priceHistory.value[priceHistory.value.length - 5]) / priceHistory.value[priceHistory.value.length - 5]) * 100
-    if (Math.abs(fiveMinChange) > 0.5) {
-      alerts.push({
-        type: fiveMinChange > 0 ? 'positive' : 'negative',
-        message: `5min ${fiveMinChange > 0 ? 'spike' : 'drop'} of ${Math.abs(fiveMinChange).toFixed(2)}%`,
-        change: `${fiveMinChange > 0 ? '+' : ''}${fiveMinChange.toFixed(2)}%`,
-        time: '5m'
-      })
-    }
-  }
-  
-  // Check volatility
-  if (priceStats.value.volatility > 0.3) {
-    alerts.push({
-      type: 'warning',
-      message: `High volatility detected (${priceStats.value.volatility.toFixed(2)}%)`,
-      change: `${priceStats.value.volatility.toFixed(2)}%`,
-      time: '30m'
-    })
-  }
-  
-  // Add alerts
-  alerts.forEach(alert => {
-    priceAlerts.value.unshift({
-      ...alert,
-      id: Date.now() + Math.random()
-    })
-    
-    // Create notification for significant alerts
-    if (Math.abs(parseFloat(alert.change)) > 1) {
-      notification.showNotification({
-        type: alert.type === 'positive' ? 'success' : alert.type === 'negative' ? 'error' : 'warning',
-        message: `Gold: ${alert.message}`,
-        duration: 5000
-      })
-    }
-  })
-  
-  // Keep only last 10 alerts
-  if (priceAlerts.value.length > 10) {
-    priceAlerts.value = priceAlerts.value.slice(0, 10)
-  }
+const getGoldBarHeight = (price) => {
+  const range = goldStats.value.max - goldStats.value.min || 1
+  return ((price - goldStats.value.min) / range) * 80 + 10
 }
 
-const getBarHeight = (price) => {
-  const stats = priceStats.value
-  const range = stats.max - stats.min || 1
-  return ((price - stats.min) / range) * 80 + 10
-}
-
-const getBarClass = (price) => {
+const getGoldBarClass = (price) => {
   if (!goldData.value) return ''
   return price > goldData.value.price ? 'above' : price < goldData.value.price ? 'below' : ''
 }
 
-const getBarTime = (index) => {
-  if (index < priceTimestamps.value.length) {
-    const time = priceTimestamps.value[index]
-    const mins = Math.floor((new Date() - time) / 60000)
+const getGoldBarTime = (index) => {
+  if (index < goldTimestamps.value.length) {
+    const mins = Math.floor((new Date() - goldTimestamps.value[index]) / 60000)
+    return `${mins}m ago`
+  }
+  return 'current'
+}
+
+// ============== DXY COMPUTED ==============
+const dxyStats = computed(() => {
+  const prices = [...dxyHistory.value, dxyData.value?.ld].filter(p => p)
+  if (prices.length === 0) {
+    return { 
+      max: dxyData.value?.ld || 0, 
+      min: dxyData.value?.ld || 0, 
+      avg: dxyData.value?.ld || 0, 
+      change: 0, 
+      changePercent: 0 
+    }
+  }
+  
+  const max = Math.max(...prices)
+  const min = Math.min(...prices)
+  const avg = prices.reduce((a, b) => a + b, 0) / prices.length
+  const change = prices.length > 1 ? prices[prices.length - 1] - prices[0] : 0
+  const changePercent = prices[0] ? (change / prices[0]) * 100 : 0
+  
+  return { max, min, avg, change, changePercent }
+})
+
+const dxyTrend = computed(() => {
+  if (dxyHistory.value.length < 2) return 'stable'
+  const lastTwo = dxyHistory.value.slice(-2)
+  if (lastTwo[1] > lastTwo[0]) return 'up'
+  if (lastTwo[1] < lastTwo[0]) return 'down'
+  return 'stable'
+})
+
+const dxyHighTime = computed(() => {
+  if (!dxyData.value) return ''
+  const prices = [...dxyHistory.value, dxyData.value.ld]
+  const max = Math.max(...prices)
+  const index = prices.indexOf(max)
+  if (index === prices.length - 1) return 'Current'
+  if (index < dxyTimestamps.value.length) {
+    const mins = Math.floor((new Date() - dxyTimestamps.value[index]) / 60000)
+    return `${mins}m ago`
+  }
+  return ''
+})
+
+const dxyLowTime = computed(() => {
+  if (!dxyData.value) return ''
+  const prices = [...dxyHistory.value, dxyData.value.ld]
+  const min = Math.min(...prices)
+  const index = prices.indexOf(min)
+  if (index === prices.length - 1) return 'Current'
+  if (index < dxyTimestamps.value.length) {
+    const mins = Math.floor((new Date() - dxyTimestamps.value[index]) / 60000)
+    return `${mins}m ago`
+  }
+  return ''
+})
+
+const getDxyBarHeight = (price) => {
+  const range = dxyStats.value.max - dxyStats.value.min || 1
+  return ((price - dxyStats.value.min) / range) * 80 + 10
+}
+
+const getDxyBarClass = (price) => {
+  if (!dxyData.value) return ''
+  return price > dxyData.value.ld ? 'above' : price < dxyData.value.ld ? 'below' : ''
+}
+
+const getDxyBarTime = (index) => {
+  if (index < dxyTimestamps.value.length) {
+    const mins = Math.floor((new Date() - dxyTimestamps.value[index]) / 60000)
     return `${mins}m ago`
   }
   return 'current'
@@ -679,16 +747,15 @@ const markAlertAsRead = (alert) => {
 }
 
 const loadMoreAlerts = () => {
-  // Simulate loading more alerts
   alertPage.value++
-  // In real app, fetch more from API
 }
 
 // ============== TIMERS ==============
 const startTimers = () => {
-  // Fetch gold every 60 seconds
+  // Fetch every 60 seconds
   timerInterval = setInterval(() => {
     fetchGoldPrice()
+    fetchDXYPrice()
   }, 60000)
   
   // Update countdown every second
@@ -718,6 +785,28 @@ const formatPrice = (price) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(price)
+}
+
+const formatDxyPrice = (price) => {
+  if (!price) return '---'
+  return price.toFixed(3)
+}
+
+const formatDxyChange = (change) => {
+  if (change === 0) return '0.000'
+  return `${change > 0 ? '+' : ''}${change.toFixed(3)}`
+}
+
+const formatDxyTime = (timestamp) => {
+  if (!timestamp) return 'Unknown'
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / 60000)
+  
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
+  return date.toLocaleTimeString()
 }
 
 const formatLastUpdated = (readable, timestamp) => {
@@ -765,16 +854,13 @@ const formatAlertTime = (timestamp) => {
 // ============== LIFECYCLE ==============
 onMounted(() => {
   fetchGoldPrice()
+  fetchDXYPrice()
   startTimers()
 })
 
 onUnmounted(() => {
-  if (timerInterval) {
-    clearInterval(timerInterval)
-  }
-  if (countdownInterval) {
-    clearInterval(countdownInterval)
-  }
+  if (timerInterval) clearInterval(timerInterval)
+  if (countdownInterval) clearInterval(countdownInterval)
 })
 </script>
 
@@ -872,7 +958,7 @@ onUnmounted(() => {
   justify-content: center;
 }
 
-/* Connection Status (Gold Tab) */
+/* Connection Status */
 .connection-status {
   display: flex;
   align-items: center;
@@ -987,6 +1073,375 @@ onUnmounted(() => {
   to { transform: rotate(360deg); }
 }
 
+/* Charts Grid Layout */
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 1024px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+/* Price Cards */
+.price-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
+}
+
+.price-card:hover {
+  transform: translateY(-2px);
+}
+
+.gold-card {
+  background: linear-gradient(135deg, #f5e7d3 0%, #f8f0e3 100%);
+  border: 1px solid #e9d9c4;
+}
+
+.dxy-card {
+  background: linear-gradient(135deg, #e3f2fd 0%, #f0f7ff 100%);
+  border: 1px solid #bbdefb;
+}
+
+.dark .gold-card {
+  background: linear-gradient(135deg, #2d2a24 0%, #353027 100%);
+  border-color: #5f4e3a;
+}
+
+.dark .dxy-card {
+  background: linear-gradient(135deg, #1a2a3a 0%, #1f2f3f 100%);
+  border-color: #2c3e50;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-icon {
+  font-size: 24px;
+}
+
+.card-title h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.gold-card .card-title h2 {
+  color: #b8860b;
+}
+
+.dxy-card .card-title h2 {
+  color: #1976d2;
+}
+
+.dark .gold-card .card-title h2 {
+  color: #fbbf24;
+}
+
+.dark .dxy-card .card-title h2 {
+  color: #64b5f6;
+}
+
+.card-symbol {
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.last-updated {
+  font-size: 10px;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.dark .last-updated {
+  background: rgba(0, 0, 0, 0.3);
+  color: #9ca3af;
+}
+
+.price-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.price-main {
+  display: flex;
+  flex-direction: column;
+}
+
+.price-label {
+  font-size: 11px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.price-value {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.gold-card .price-value {
+  color: #b8860b;
+}
+
+.dxy-card .price-value {
+  color: #1976d2;
+}
+
+.dark .gold-card .price-value {
+  color: #fbbf24;
+}
+
+.dark .dxy-card .price-value {
+  color: #64b5f6;
+}
+
+.price-currency {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.price-change {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  min-width: 160px;
+}
+
+.dark .price-change {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.price-change.up {
+  color: #10b981;
+}
+
+.price-change.down {
+  color: #ef4444;
+}
+
+.price-change.stable {
+  color: #6b7280;
+}
+
+.trend-icon {
+  font-size: 16px;
+}
+
+.trend-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.trend-text {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.trend-change {
+  font-size: 9px;
+  opacity: 0.9;
+}
+
+/* Price Chart */
+.price-chart {
+  margin-bottom: 16px;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.chart-header h3 {
+  margin: 0;
+  font-size: 12px;
+  color: #1f2937;
+}
+
+.dark .chart-header h3 {
+  color: white;
+}
+
+.chart-interval {
+  font-size: 9px;
+  color: #6b7280;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.chart-container {
+  display: flex;
+  gap: 8px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.dark .chart-container {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.chart-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 8px;
+  color: #6b7280;
+  padding-right: 8px;
+  border-right: 1px solid #d1d5db;
+  min-width: 45px;
+}
+
+.dark .chart-y-axis {
+  border-right-color: #4b5563;
+}
+
+.chart-bars {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  position: relative;
+}
+
+.chart-bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+}
+
+.chart-bar {
+  width: 100%;
+  background: #d4a373;
+  border-radius: 3px 3px 0 0;
+  transition: height 0.3s;
+  position: relative;
+  min-height: 3px;
+  cursor: pointer;
+}
+
+.chart-bar.above {
+  background: #10b981;
+}
+
+.chart-bar.below {
+  background: #ef4444;
+}
+
+.bar-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2937;
+  color: white;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 7px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  z-index: 10;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.chart-bar:hover .bar-tooltip {
+  opacity: 1;
+}
+
+.bar-label {
+  font-size: 7px;
+  color: #6b7280;
+  transform: rotate(-45deg);
+  white-space: nowrap;
+}
+
+/* Price Stats */
+.price-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 8px;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.stat-value {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 2px;
+}
+
+.dark .stat-value {
+  color: white;
+}
+
+.stat-value.positive {
+  color: #10b981;
+}
+
+.stat-value.negative {
+  color: #ef4444;
+}
+
+.stat-time {
+  font-size: 7px;
+  color: #6b7280;
+}
+
 /* VPS Status (Telegram Tab) */
 .vps-status {
   display: flex;
@@ -1072,6 +1527,17 @@ onUnmounted(() => {
   margin-bottom: 18px;
 }
 
+.stat-card {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.dark .stat-card {
+  background: #374151;
+}
+
 /* Alert Filters */
 .alert-filters {
   display: flex;
@@ -1110,430 +1576,7 @@ onUnmounted(() => {
   padding-right: 4px;
 }
 
-/* Gold Card */
-.gold-card {
-  background: linear-gradient(135deg, #f5e7d3 0%, #f8f0e3 100%);
-  border-radius: 16px;
-  padding: 24px;
-  margin-bottom: 24px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e9d9c4;
-}
-
-.dark .gold-card {
-  background: linear-gradient(135deg, #2d2a24 0%, #353027 100%);
-  border-color: #5f4e3a;
-}
-
-.gold-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.gold-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.gold-icon {
-  font-size: 32px;
-}
-
-.gold-title h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #b8860b;
-}
-
-.dark .gold-title h2 {
-  color: #fbbf24;
-}
-
-.gold-symbol {
-  padding: 2px 8px;
-  background: rgba(184, 134, 11, 0.2);
-  color: #b8860b;
-  border-radius: 12px;
-  font-size: 10px;
-  font-weight: 500;
-}
-
-.dark .gold-symbol {
-  background: rgba(251, 191, 36, 0.2);
-  color: #fbbf24;
-}
-
-.last-updated {
-  font-size: 10px;
-  color: #6b7280;
-  background: rgba(255, 255, 255, 0.5);
-  padding: 4px 10px;
-  border-radius: 20px;
-}
-
-.dark .last-updated {
-  background: rgba(0, 0, 0, 0.3);
-  color: #9ca3af;
-}
-
-.gold-price-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.gold-price {
-  display: flex;
-  flex-direction: column;
-}
-
-.price-label {
-  font-size: 12px;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-
-.price-value {
-  font-size: 48px;
-  font-weight: 700;
-  color: #b8860b;
-  line-height: 1.2;
-}
-
-.dark .price-value {
-  color: #fbbf24;
-}
-
-.price-currency {
-  font-size: 14px;
-  color: #6b7280;
-}
-
-.price-change-indicator {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 20px;
-  border-radius: 30px;
-  background: white;
-  min-width: 200px;
-}
-
-.dark .price-change-indicator {
-  background: #374151;
-}
-
-.price-change-indicator.up {
-  color: #10b981;
-}
-
-.price-change-indicator.down {
-  color: #ef4444;
-}
-
-.price-change-indicator.stable {
-  color: #6b7280;
-}
-
-.trend-icon {
-  font-size: 20px;
-}
-
-.trend-details {
-  display: flex;
-  flex-direction: column;
-}
-
-.trend-text {
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.trend-change {
-  font-size: 11px;
-  opacity: 0.9;
-}
-
-/* Price Chart */
-.price-chart {
-  margin-bottom: 24px;
-}
-
-.chart-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.chart-header h3 {
-  margin: 0;
-  font-size: 14px;
-  color: #1f2937;
-}
-
-.dark .chart-header h3 {
-  color: white;
-}
-
-.chart-interval {
-  font-size: 10px;
-  color: #6b7280;
-  background: rgba(255, 255, 255, 0.5);
-  padding: 2px 8px;
-  border-radius: 12px;
-}
-
-.dark .chart-interval {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-.chart-container {
-  display: flex;
-  gap: 10px;
-  height: 200px;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  padding: 15px;
-}
-
-.dark .chart-container {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.chart-y-axis {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  font-size: 9px;
-  color: #6b7280;
-  padding-right: 10px;
-  border-right: 1px solid #d1d5db;
-  min-width: 60px;
-}
-
-.dark .chart-y-axis {
-  border-right-color: #4b5563;
-}
-
-.chart-bars {
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  position: relative;
-}
-
-.chart-bar-wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  height: 100%;
-}
-
-.chart-bar {
-  width: 100%;
-  background: #d4a373;
-  border-radius: 4px 4px 0 0;
-  transition: height 0.3s;
-  position: relative;
-  min-height: 4px;
-  cursor: pointer;
-}
-
-.chart-bar.above {
-  background: #10b981;
-}
-
-.chart-bar.below {
-  background: #ef4444;
-}
-
-.bar-tooltip {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #1f2937;
-  color: white;
-  padding: 4px 6px;
-  border-radius: 4px;
-  font-size: 8px;
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.2s;
-  pointer-events: none;
-  z-index: 10;
-  line-height: 1.4;
-  text-align: center;
-}
-
-.chart-bar:hover .bar-tooltip {
-  opacity: 1;
-}
-
-.bar-label {
-  font-size: 8px;
-  color: #6b7280;
-  transform: rotate(-45deg);
-  white-space: nowrap;
-}
-
-/* Price Stats */
-.price-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 8px;
-  padding: 12px;
-  text-align: center;
-}
-
-.dark .stat-card {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.stat-label {
-  display: block;
-  font-size: 9px;
-  color: #6b7280;
-  margin-bottom: 4px;
-}
-
-.stat-value {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 2px;
-}
-
-.dark .stat-value {
-  color: white;
-}
-
-.stat-value.positive {
-  color: #10b981;
-}
-
-.stat-value.negative {
-  color: #ef4444;
-}
-
-.stat-time {
-  font-size: 8px;
-  color: #6b7280;
-}
-
-/* Price Alerts */
-.price-alerts {
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 8px;
-  padding: 12px;
-}
-
-.dark .price-alerts {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.alerts-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 10px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #1f2937;
-}
-
-.dark .alerts-title {
-  color: white;
-}
-
-.alert-icon {
-  font-size: 14px;
-}
-
-.alerts-scroll {
-  max-height: 100px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.price-alert-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  margin-bottom: 4px;
-  background: white;
-  border-radius: 4px;
-  font-size: 10px;
-}
-
-.dark .price-alert-item {
-  background: #374151;
-}
-
-.price-alert-item.positive {
-  border-left: 3px solid #10b981;
-}
-
-.price-alert-item.negative {
-  border-left: 3px solid #ef4444;
-}
-
-.price-alert-item.warning {
-  border-left: 3px solid #f59e0b;
-}
-
-.alert-time {
-  font-weight: 600;
-  color: #6b7280;
-  min-width: 35px;
-}
-
-.alert-message {
-  flex: 1;
-  color: #1f2937;
-}
-
-.dark .alert-message {
-  color: white;
-}
-
-.alert-change {
-  font-weight: 600;
-  min-width: 60px;
-  text-align: right;
-}
-
-.alert-change.positive {
-  color: #10b981;
-}
-
-.alert-change.negative {
-  color: #ef4444;
-}
-
-/* Alert Cards (Telegram Tab) */
+/* Alert Cards */
 .alert-card {
   display: flex;
   gap: 12px;
@@ -1750,7 +1793,7 @@ onUnmounted(() => {
   height: 40px;
   margin: 0 auto 12px;
   border: 3px solid #f3f4f6;
-  border-top-color: #fbbf24;
+  border-top-color: #3b82f6;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -1784,6 +1827,10 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
+.btn-retry:hover {
+  background: #2563eb;
+}
+
 /* No Alerts */
 .no-alerts {
   text-align: center;
@@ -1803,16 +1850,6 @@ onUnmounted(() => {
 }
 
 /* Responsive */
-@media (max-width: 1024px) {
-  .price-stats {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  
-  .vps-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
 @media (max-width: 768px) {
   .tab-navigation {
     flex-direction: column;
@@ -1828,44 +1865,21 @@ onUnmounted(() => {
     justify-content: center;
   }
   
-  .price-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .vps-stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .gold-price-container {
+  .price-container {
     flex-direction: column;
     align-items: flex-start;
   }
   
-  .gold-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .price-change-indicator {
+  .price-change {
     width: 100%;
+  }
+  
+  .price-value {
+    font-size: 28px;
   }
   
   .chart-container {
-    flex-direction: column;
-    height: auto;
-  }
-  
-  .chart-y-axis {
-    flex-direction: row;
-    border-right: none;
-    border-bottom: 1px solid #d1d5db;
-    padding-right: 0;
-    padding-bottom: 10px;
-    width: 100%;
-  }
-  
-  .chart-bars {
-    height: 150px;
+    height: 100px;
   }
   
   .vps-controls {
@@ -1884,23 +1898,23 @@ onUnmounted(() => {
 
 @media (max-width: 480px) {
   .price-value {
-    font-size: 36px;
+    font-size: 24px;
   }
   
   .price-stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
   
   .vps-stats {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
   }
   
-  .price-change-indicator {
-    padding: 10px;
+  .price-change {
+    padding: 6px 10px;
   }
   
   .trend-details {
-    font-size: 10px;
+    font-size: 9px;
   }
   
   .alert-card {
@@ -1920,6 +1934,35 @@ onUnmounted(() => {
   .alert-meta {
     flex-direction: column;
     gap: 4px;
+  }
+}
+
+/* Touch Improvements */
+@media (hover: none) and (pointer: coarse) {
+  .tab-btn,
+  .btn-refresh,
+  .btn-test,
+  .btn-clear,
+  .btn-load-more,
+  .btn-retry,
+  .filter-select,
+  .filter-input {
+    padding: 12px;
+    font-size: 14px;
+  }
+  
+  .chart-bar {
+    min-height: 6px;
+  }
+  
+  .alert-card {
+    padding: 15px;
+  }
+  
+  .alert-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
   }
 }
 </style>
