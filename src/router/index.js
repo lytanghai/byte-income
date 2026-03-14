@@ -5,6 +5,7 @@ import Login from '../views/Login.vue'
 import Overview from '../views/Overview.vue'
 import Performance from '../views/Performance.vue'
 import Insight from '../views/Insight.vue'
+import Transaction from '../views/Transaction.vue'
 import Market from '../views/Market.vue'
 import Report from '../views/Report.vue'
 import Users from '../views/Users.vue'
@@ -24,6 +25,7 @@ const routes = [
     children: [
       { path: '', redirect: '/overview' }, // Default route
       { path: 'overview', name: 'Overview', component: Overview },
+      { path: 'transaction', name: 'Transaction', component: Transaction },
       { path: 'performance', name: 'Performance', component: Performance },
       { path: 'insight', name: 'Insight', component: Insight },
       { path: 'market', name: 'Market', component: Market },

@@ -165,7 +165,7 @@
         </div>
 
         <!-- Loading state -->
-        <div v-if="transactionsLoading" class="loading-state small">
+        <div v-if="transactionsLoading && transactions.length === 0" class="loading-state small">
           <div class="spinner-small"></div>
           <p>Loading transactions...</p>
         </div>
@@ -173,7 +173,7 @@
         <!-- Error state -->
         <div v-else-if="transactionsError" class="error-state small">
           <p class="error-message">{{ transactionsError }}</p>
-          <button @click="fetchTransactions" class="btn-retry">Retry</button>
+          <button @click="fetchTransactions(true)" class="btn-retry">Retry</button>
         </div>
 
         <!-- Transactions List -->
@@ -237,6 +237,12 @@ const notification = useNotification()
 // API Base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
+// Cache keys for localStorage
+const CALENDAR_CACHE_KEY = 'performance_calendar_cache'
+const CALENDAR_TIMESTAMP_KEY = 'performance_calendar_timestamp'
+const TRANSACTIONS_CACHE_KEY = 'performance_transactions_cache'
+const TRANSACTIONS_TIMESTAMP_KEY = 'performance_transactions_timestamp'
+
 // State
 const selectedMonth = ref(new Date().getMonth() + 1) // 1-12
 const selectedYear = ref(new Date().getFullYear())
@@ -294,7 +300,94 @@ const years = computed(() => {
 // Weekdays
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-// Calendar helpers
+// ============== CACHE MANAGEMENT ==============
+const saveCalendarToCache = (data) => {
+  try {
+    const cacheData = {
+      data: data,
+      month: selectedMonth.value,
+      year: selectedYear.value
+    }
+    localStorage.setItem(CALENDAR_CACHE_KEY, JSON.stringify(cacheData))
+    localStorage.setItem(CALENDAR_TIMESTAMP_KEY, new Date().toISOString())
+    console.log('✅ Calendar data saved to cache')
+  } catch (err) {
+    console.error('Failed to save calendar to cache:', err)
+  }
+}
+
+const loadCalendarFromCache = () => {
+  try {
+    const cached = localStorage.getItem(CALENDAR_CACHE_KEY)
+    const timestamp = localStorage.getItem(CALENDAR_TIMESTAMP_KEY)
+    
+    if (cached && timestamp) {
+      const cacheData = JSON.parse(cached)
+      
+      // Check if cached data is for current month/year
+      if (cacheData.month === selectedMonth.value && cacheData.year === selectedYear.value) {
+        calendarData.value = cacheData.data
+        console.log('✅ Calendar loaded from cache')
+        return true
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load calendar from cache:', err)
+  }
+  return false
+}
+
+const saveTransactionsToCache = (data) => {
+  try {
+    const cacheKey = `${TRANSACTIONS_CACHE_KEY}_${selectedMonth.value}_${selectedYear.value}${selectedDay.value ? '_' + selectedDay.value.day : ''}`
+    const cacheData = {
+      data: data,
+      page: currentTransactionPage.value,
+      hasMore: hasMoreTransactions.value,
+      total: totalTransactionElements.value,
+      filters: {
+        type: transactionFilter.type,
+        currency: transactionFilter.currency,
+        symbol: transactionFilter.symbol
+      }
+    }
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData))
+    localStorage.setItem(TRANSACTIONS_TIMESTAMP_KEY, new Date().toISOString())
+    console.log('✅ Transactions saved to cache')
+  } catch (err) {
+    console.error('Failed to save transactions to cache:', err)
+  }
+}
+
+const loadTransactionsFromCache = () => {
+  try {
+    const cacheKey = `${TRANSACTIONS_CACHE_KEY}_${selectedMonth.value}_${selectedYear.value}${selectedDay.value ? '_' + selectedDay.value.day : ''}`
+    const cached = localStorage.getItem(cacheKey)
+    
+    if (cached) {
+      const cacheData = JSON.parse(cached)
+      
+      // Check if filters match
+      if (cacheData.filters.type === transactionFilter.type &&
+          cacheData.filters.currency === transactionFilter.currency &&
+          cacheData.filters.symbol === transactionFilter.symbol) {
+        
+        transactions.value = cacheData.data
+        currentTransactionPage.value = cacheData.page
+        hasMoreTransactions.value = cacheData.hasMore
+        totalTransactionElements.value = cacheData.total
+        
+        console.log('✅ Transactions loaded from cache')
+        return true
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load transactions from cache:', err)
+  }
+  return false
+}
+
+// ============== COMPUTED ==============
 const startDayOffset = computed(() => {
   if (!calendarData.value) return 0
   const firstDay = new Date(calendarData.value.year, calendarData.value.month - 1, 1)
@@ -329,7 +422,7 @@ const hasActiveFilters = computed(() => {
   return transactionFilter.type || transactionFilter.currency || transactionFilter.symbol
 })
 
-// Helper functions
+// ============== HELPER FUNCTIONS ==============
 const formatCurrency = (value) => {
   if (value === undefined || value === null) return '$0.00'
   return new Intl.NumberFormat('en-US', {
@@ -396,7 +489,6 @@ const getAmountClass = (transaction) => {
 const formatTransactionAmount = (transaction) => {
   if (!transaction) return '-'
   
-  // Try different possible amount fields
   const amount = transaction.amount || transaction.pnl || transaction.value || 0
   
   if (transaction.type === 'PROFIT' || transaction.type === 'LOSS') {
@@ -420,12 +512,11 @@ const getDayClass = (day) => {
 
 const selectDay = (day) => {
   selectedDay.value = day
-  fetchTransactions()
-  // Close mobile filters if open
+  fetchTransactions(true)
   showFilters.value = false
 }
 
-// Filter controls
+// ============== FILTER CONTROLS ==============
 const toggleFilters = () => {
   showFilters.value = !showFilters.value
 }
@@ -438,7 +529,7 @@ const clearFilters = () => {
   showFilters.value = false
 }
 
-// Get auth token
+// ============== API CALLS ==============
 const getAuthToken = () => {
   const authToken = localStorage.getItem('authToken')
   if (!authToken) {
@@ -448,7 +539,6 @@ const getAuthToken = () => {
   return authToken
 }
 
-// Debounce function for search
 const debounce = (fn, delay) => {
   let timeoutId
   return (...args) => {
@@ -458,7 +548,17 @@ const debounce = (fn, delay) => {
 }
 
 // Fetch monthly performance
-const fetchMonthlyPerformance = async () => {
+const fetchMonthlyPerformance = async (forceRefresh = false) => {
+  // Try to load from cache first (NO API CALL)
+  if (!forceRefresh) {
+    const loaded = loadCalendarFromCache()
+    if (loaded) {
+      // Still fetch transactions for the month
+      fetchTransactions(true)
+      return
+    }
+  }
+  
   calendarLoading.value = true
   calendarError.value = null
   
@@ -481,10 +581,9 @@ const fetchMonthlyPerformance = async () => {
     
     if (data.code === '200') {
       calendarData.value = data.data
-      // Reset selected day when month changes
+      saveCalendarToCache(data.data)
       selectedDay.value = null
-      // Fetch transactions for new month
-      fetchTransactions()
+      fetchTransactions(true)
       notification.success(`Loaded data for ${months[selectedMonth.value - 1].label} ${selectedYear.value}`)
     } else {
       throw new Error(data.message || 'Failed to fetch calendar data')
@@ -499,6 +598,14 @@ const fetchMonthlyPerformance = async () => {
 
 // Fetch transactions
 const fetchTransactions = async (reset = true) => {
+  // Try to load from cache first (NO API CALL)
+  if (reset) {
+    const loaded = loadTransactionsFromCache()
+    if (loaded) {
+      return
+    }
+  }
+  
   if (reset) {
     currentTransactionPage.value = 0
     transactions.value = []
@@ -515,14 +622,11 @@ const fetchTransactions = async (reset = true) => {
       page: currentTransactionPage.value.toString()
     }
     
-    // Add optional filters
     if (transactionFilter.type) payload.type = transactionFilter.type
     if (transactionFilter.currency) payload.currency = transactionFilter.currency
     if (transactionFilter.symbol) payload.symbol = transactionFilter.symbol
     
-    // Add date filter with correct day (no timezone offset)
     if (selectedDay.value && calendarData.value) {
-      // Format date as YYYY-MM-DD without timezone issues
       const year = calendarData.value.year
       const month = String(calendarData.value.month).padStart(2, '0')
       const day = String(selectedDay.value.day).padStart(2, '0')
@@ -550,6 +654,8 @@ const fetchTransactions = async (reset = true) => {
       totalTransactionElements.value = data.data.total_element || 0
       hasMoreTransactions.value = transactions.value.length < totalTransactionElements.value
       
+      saveTransactionsToCache(transactions.value)
+      
       if (reset && transactions.value.length === 0) {
         notification.info('No transactions found for this period')
       }
@@ -564,7 +670,6 @@ const fetchTransactions = async (reset = true) => {
   }
 }
 
-// Load more transactions
 const loadMoreTransactions = () => {
   if (hasMoreTransactions.value && !transactionsLoading.value) {
     currentTransactionPage.value++
@@ -572,7 +677,6 @@ const loadMoreTransactions = () => {
   }
 }
 
-// Debounced search
 const debouncedFetchTransactions = debounce(() => {
   fetchTransactions(true)
 }, 500)

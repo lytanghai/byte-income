@@ -11,30 +11,34 @@
             <div class="menu-container">
                 <nav class="menu">
                     <RouterLink @click="closeSidebar" to="/overview">
-                        <span class="menu-icon">📊</span>
+                        <!-- <span class="menu-icon">📊</span> -->
                         <span class="menu-text">Overview</span>
                     </RouterLink>
+                    <RouterLink @click="closeSidebar" to="/transaction">
+                        <!-- <span class="menu-icon">📈</span> -->
+                        <span class="menu-text">Transaction</span>
+                    </RouterLink>
                     <RouterLink @click="closeSidebar" to="/performance">
-                        <span class="menu-icon">📈</span>
+                        <!-- <span class="menu-icon">📈</span> -->
                         <span class="menu-text">Performance</span>
                     </RouterLink>
                     <RouterLink @click="closeSidebar" to="/insight">
-                        <span class="menu-icon">💡</span>
+                        <!-- <span class="menu-icon">💡</span> -->
                         <span class="menu-text">Insight</span>
                     </RouterLink>
                     <RouterLink @click="closeSidebar" to="/market">
-                        <span class="menu-icon">🏪</span>
+                        <!-- <span class="menu-icon">🏪</span> -->
                         <span class="menu-text">Market</span>
                     </RouterLink>
                     <RouterLink @click="closeSidebar" to="/report">
-                        <span class="menu-icon">📄</span>
+                        <!-- <span class="menu-icon">📄</span> -->
                         <span class="menu-text">Report</span>
                     </RouterLink>
                     
                     <div class="menu-group">
                         <div class="menu-parent" @click="toggleSetting">
                             <span class="menu-parent-content">
-                                <span class="menu-icon">⚙️</span>
+                                <!-- <span class="menu-icon">⚙️</span> -->
                                 <span class="menu-text">Setting</span>
                             </span>
                             <span class="arrow">{{ settingOpen ? '▾' : '▸' }}</span>
@@ -42,12 +46,12 @@
 
                         <div v-if="settingOpen" class="submenu">
                             <RouterLink @click="closeSidebar" to="/setting/users">
-                                <span class="menu-icon">👥</span>
+                                <!-- <span class="menu-icon">👥</span> -->
                                 <span class="menu-text">Users</span>
                             </RouterLink>
 
                             <RouterLink @click="closeSidebar" to="/setting/configuration">
-                                <span class="menu-icon">⚙️</span>
+                                <!-- <span class="menu-icon">⚙️</span> -->
                                 <span class="menu-text">Configuration</span>
                             </RouterLink>
                         </div>
@@ -61,7 +65,7 @@
                     <span class="username">{{ (username || 'N/A').toUpperCase() }}</span>
                 </div>
                 <button class="logout-sidebar" @click="handleLogout">
-                    <span class="menu-icon">🚪</span>
+                    <span class="menu-icon">⏻</span>
                     <span class="menu-text">Logout</span>
                 </button>
             </div>

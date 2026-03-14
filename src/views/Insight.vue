@@ -182,7 +182,7 @@
         <!-- News Feed Tab -->
         <div v-show="activeTab === 'news'" class="news-feed">
           <!-- Loading State -->
-          <div v-if="loading" class="loading-state">
+          <div v-if="loading && allNews.length === 0" class="loading-state">
             <div class="spinner"></div>
             <p>Loading news...</p>
           </div>
@@ -190,7 +190,7 @@
           <!-- Error State -->
           <div v-else-if="error" class="error-state">
             <p class="error-message">{{ error }}</p>
-            <button @click="fetchNews" class="btn-retry">Retry</button>
+            <button @click="fetchNews(true)" class="btn-retry">Retry</button>
           </div>
 
           <!-- News List -->
@@ -275,7 +275,7 @@
         <!-- Events Tab -->
         <div v-show="activeTab === 'events'" class="events-feed">
           <!-- Loading State -->
-          <div v-if="eventsLoading" class="loading-state">
+          <div v-if="eventsLoading && events.length === 0" class="loading-state">
             <div class="spinner"></div>
             <p>Loading economic calendar...</p>
           </div>
@@ -283,7 +283,7 @@
           <!-- Error State -->
           <div v-else-if="eventsError" class="error-state">
             <p class="error-message">{{ eventsError }}</p>
-            <button @click="fetchEvents" class="btn-retry">Retry</button>
+            <button @click="fetchEvents(true)" class="btn-retry">Retry</button>
           </div>
 
           <!-- Events List -->
@@ -353,6 +353,12 @@ const notification = useNotification()
 // API Base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
+// Cache keys for localStorage
+const NEWS_CACHE_KEY = 'insight_news_cache'
+const NEWS_TIMESTAMP_KEY = 'insight_news_timestamp'
+const EVENTS_CACHE_KEY = 'insight_events_cache'
+const EVENTS_TIMESTAMP_KEY = 'insight_events_timestamp'
+
 // State
 const allNews = ref([])
 const events = ref([])
@@ -375,6 +381,93 @@ const filters = reactive({
   keyword: '',
   source: ''
 })
+
+// ============== CACHE MANAGEMENT ==============
+const saveNewsToCache = (data) => {
+  try {
+    const cacheData = {
+      data: data,
+      filters: {
+        category: filters.category,
+        market: filters.market,
+        impact: filters.impact,
+        keyword: filters.keyword,
+        source: filters.source
+      }
+    }
+    localStorage.setItem(NEWS_CACHE_KEY, JSON.stringify(cacheData))
+    localStorage.setItem(NEWS_TIMESTAMP_KEY, new Date().toISOString())
+    console.log('✅ News saved to cache')
+  } catch (err) {
+    console.error('Failed to save news to cache:', err)
+  }
+}
+
+const loadNewsFromCache = () => {
+  try {
+    const cached = localStorage.getItem(NEWS_CACHE_KEY)
+    
+    if (cached) {
+      const cacheData = JSON.parse(cached)
+      
+      // Check if filters match
+      if (cacheData.filters.category === filters.category &&
+          cacheData.filters.market === filters.market &&
+          cacheData.filters.impact === filters.impact &&
+          cacheData.filters.keyword === filters.keyword &&
+          cacheData.filters.source === filters.source) {
+        
+        allNews.value = cacheData.data
+        console.log('✅ News loaded from cache')
+        return true
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load news from cache:', err)
+  }
+  return false
+}
+
+const saveEventsToCache = (data) => {
+  try {
+    const cacheData = {
+      data: data,
+      filters: {
+        impact: filters.impact,
+        country: filters.country,
+        keyword: filters.keyword
+      }
+    }
+    localStorage.setItem(EVENTS_CACHE_KEY, JSON.stringify(cacheData))
+    localStorage.setItem(EVENTS_TIMESTAMP_KEY, new Date().toISOString())
+    console.log('✅ Events saved to cache')
+  } catch (err) {
+    console.error('Failed to save events to cache:', err)
+  }
+}
+
+const loadEventsFromCache = () => {
+  try {
+    const cached = localStorage.getItem(EVENTS_CACHE_KEY)
+    
+    if (cached) {
+      const cacheData = JSON.parse(cached)
+      
+      // Check if filters match
+      if (cacheData.filters.impact === filters.impact &&
+          cacheData.filters.country === filters.country &&
+          cacheData.filters.keyword === filters.keyword) {
+        
+        events.value = cacheData.data
+        console.log('✅ Events loaded from cache')
+        return true
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load events from cache:', err)
+  }
+  return false
+}
 
 // Update current time every second
 const startTimer = () => {
@@ -707,7 +800,15 @@ const getAuthToken = () => {
 }
 
 // Fetch news
-const fetchNews = async () => {
+const fetchNews = async (forceRefresh = false) => {
+  // Try to load from cache first (NO API CALL)
+  if (!forceRefresh) {
+    const loaded = loadNewsFromCache()
+    if (loaded) {
+      return
+    }
+  }
+  
   loading.value = true
   error.value = null
   
@@ -734,6 +835,7 @@ const fetchNews = async () => {
     
     if (data.code === '200') {
       allNews.value = data.data || []
+      saveNewsToCache(allNews.value)
       notification.success(`Loaded ${allNews.value.length} news articles`)
     } else {
       throw new Error(data.message || 'Failed to fetch news')
@@ -747,7 +849,15 @@ const fetchNews = async () => {
 }
 
 // Fetch Forex Factory events
-const fetchEvents = async () => {
+const fetchEvents = async (forceRefresh = false) => {
+  // Try to load from cache first (NO API CALL)
+  if (!forceRefresh) {
+    const loaded = loadEventsFromCache()
+    if (loaded) {
+      return
+    }
+  }
+  
   eventsLoading.value = true
   eventsError.value = null
   
@@ -766,6 +876,7 @@ const fetchEvents = async () => {
     
     if (data.code === '200') {
       events.value = data.data || []
+      saveEventsToCache(events.value)
       notification.success(`Loaded ${events.value.length} economic events`)
     } else {
       throw new Error(data.message || 'Failed to fetch events')
@@ -783,7 +894,6 @@ watch([() => filters.category, () => filters.market, () => filters.impact, () =>
   applyFilters()
 })
 </script>
-
 <style scoped>
 .insight-page {
   padding: clamp(12px, 2.25vw, 18px);
