@@ -231,7 +231,7 @@
             <select 
               id="symbol"
               v-model="form.symbol" 
-              :required="isTradingType"
+     
               class="form-select"
             >
               <option value="">-- Select Symbol --</option>
@@ -300,7 +300,6 @@
               v-model="form.lot_size" 
               step="0.01"
               min="0"
-              required
               class="form-input"
               placeholder="0.01"
             />
@@ -314,7 +313,6 @@
               id="pnl"
               v-model="form.pnl" 
               step="0.01"
-              required
               class="form-input"
               :placeholder="amountPlaceholder"
             />
@@ -326,7 +324,6 @@
             <select 
               id="currency"
               v-model="form.currency" 
-              required
               class="form-select"
             >
               <option value="">Select Currency</option>
@@ -619,10 +616,10 @@ const createTransaction = async () => {
       type: form.type.toLowerCase() // Required
     }
     
-    // Add optional date if provided
+    // Add optional date if provided - FORMAT: DD/MM/YYYY
     if (form.date) {
       const [year, month, day] = form.date.split('-')
-      payload.inp_date = `${day}/${month}/${year}`
+      payload.inp_date = `${day}/${month}/${year}` // DD/MM/YYYY format
     }
     
     console.log('📤 Creating transaction with payload:', payload)
@@ -902,15 +899,7 @@ const closeDeleteModal = () => {
 // ============== FORM SUBMISSIONS ==============
 const handleSubmit = async () => {
   // Validation
-  if (isTradingType.value && !form.symbol) {
-    notification.error('Please select a symbol for trading transactions')
-    return
-  }
-  
-  if (isTradingType.value && !form.lot_size) {
-    notification.error('Please enter lot size for trading transactions')
-    return
-  }
+
   
   submitting.value = true
   
