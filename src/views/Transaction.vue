@@ -58,15 +58,16 @@
           <option value="">All Types</option>
           <option value="PROFIT">Profit</option>
           <option value="LOSS">Loss</option>
+          <option value="DEPOSIT">Deposit</option>
+          <option value="WITHDRAWAL">Withdrawal</option>
         </select>
       </div>
       
       <div class="filter-group">
         <select v-model="filters.currency" @change="applyFilters" class="filter-select">
           <option value="">All Currencies</option>
-          <option value="USDC">USDC</option>
           <option value="USD">USD</option>
-          <option value="EUR">EUR</option>
+          <option value="USDC">USDC</option>
         </select>
       </div>
       
@@ -143,7 +144,7 @@
               <th>Symbol</th>
               <th>Type</th>
               <th>Lot Size</th>
-              <th>P&L</th>
+              <th>Amount</th>
               <th>Currency</th>
               <th>Date</th>
               <th>Actions</th>
@@ -153,16 +154,16 @@
             <tr v-for="transaction in paginatedTransactions" :key="transaction.sn">
               <td class="sn-cell">#{{ transaction.sn }}</td>
               <td>
-                <span class="symbol-badge">{{ transaction.symbol }}</span>
+                <span class="symbol-badge">{{ transaction.symbol || '-' }}</span>
               </td>
               <td>
                 <span class="type-badge" :class="transaction.type.toLowerCase()">
                   {{ transaction.type }}
                 </span>
               </td>
-              <td>{{ transaction.lot_size.toFixed(2) }}</td>
-              <td :class="getProfitClass(transaction.pnl)">
-                {{ formatCurrency(transaction.pnl) }}
+              <td>{{ transaction.lot_size ? transaction.lot_size.toFixed(2) : '-' }}</td>
+              <td :class="getAmountClass(transaction)">
+                {{ formatTransactionAmount(transaction) }}
               </td>
               <td>{{ transaction.currency }}</td>
               <td class="date-cell">{{ formatDate(transaction.date) }}</td>
@@ -224,24 +225,26 @@
             <input type="text" :value="form.sn" class="form-input" disabled />
           </div>
 
+          <!-- Symbol Field (optional for DEPOSIT/WITHDRAWAL) -->
           <div class="form-group">
-            <label for="symbol">Symbol *</label>
+            <label for="symbol">Symbol {{ isTradingType ? '*' : '(Optional)' }}</label>
             <select 
               id="symbol"
               v-model="form.symbol" 
-              required
+              :required="isTradingType"
               class="form-select"
             >
-              <option value="">Select Symbol</option>
+              <option value="">-- Select Symbol --</option>
               <option value="XAU">XAU (Gold)</option>
               <option value="XAG">XAG (Silver)</option>
-              <option value="BTC">BTC (Bitcoin)</option>
-              <option value="ETH">ETH (Ethereum)</option>
-              <option value="EURUSD">EUR/USD</option>
-              <option value="GBPUSD">GBP/USD</option>
+              <option value="AUD">AUD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
             </select>
+            <small v-if="!isTradingType" class="hint">Optional for deposits/withdrawals</small>
           </div>
 
+          <!-- Transaction Type -->
           <div class="form-group">
             <label>Transaction Type *</label>
             <div class="radio-group">
@@ -251,6 +254,7 @@
                   v-model="form.type" 
                   value="PROFIT"
                   required
+                  @change="handleTypeChange"
                 />
                 <span class="radio-label profit">Profit</span>
               </label>
@@ -260,13 +264,35 @@
                   v-model="form.type" 
                   value="LOSS"
                   required
+                  @change="handleTypeChange"
                 />
                 <span class="radio-label loss">Loss</span>
+              </label>
+              <label class="radio-option">
+                <input 
+                  type="radio" 
+                  v-model="form.type" 
+                  value="DEPOSIT"
+                  required
+                  @change="handleTypeChange"
+                />
+                <span class="radio-label deposit">Deposit</span>
+              </label>
+              <label class="radio-option">
+                <input 
+                  type="radio" 
+                  v-model="form.type" 
+                  value="WITHDRAWAL"
+                  required
+                  @change="handleTypeChange"
+                />
+                <span class="radio-label withdrawal">Withdrawal</span>
               </label>
             </div>
           </div>
 
-          <div class="form-group">
+          <!-- Lot Size Field (only for PROFIT/LOSS) -->
+          <div v-if="isTradingType" class="form-group">
             <label for="lot_size">Lot Size *</label>
             <input 
               type="number" 
@@ -280,8 +306,9 @@
             />
           </div>
 
+          <!-- Amount Field -->
           <div class="form-group">
-            <label for="pnl">P&L Amount *</label>
+            <label for="pnl">{{ amountLabel }} *</label>
             <input 
               type="number" 
               id="pnl"
@@ -289,10 +316,11 @@
               step="0.01"
               required
               class="form-input"
-              placeholder="100.60"
+              :placeholder="amountPlaceholder"
             />
           </div>
 
+          <!-- Currency Field -->
           <div class="form-group">
             <label for="currency">Currency *</label>
             <select 
@@ -302,13 +330,12 @@
               class="form-select"
             >
               <option value="">Select Currency</option>
-              <option value="USDC">USDC</option>
               <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-              <option value="GBP">GBP</option>
+              <option value="USDC">USDC</option>
             </select>
           </div>
 
+          <!-- Date Field (Optional) -->
           <div class="form-group">
             <label for="date">Transaction Date (Optional)</label>
             <input 
@@ -345,7 +372,7 @@
           <div class="delete-icon">⚠️</div>
           <p class="delete-message">
             Are you sure you want to delete transaction 
-            <strong>#{{ selectedTransaction?.sn }} - {{ selectedTransaction?.symbol }}</strong>?
+            <strong>#{{ selectedTransaction?.sn }} - {{ selectedTransaction?.symbol || 'N/A' }}</strong>?
           </p>
           <p class="warning">This action cannot be undone.</p>
         </div>
@@ -415,6 +442,50 @@ const filters = reactive({
   date: ''
 })
 
+// Check if selected type is trading (PROFIT/LOSS)
+const isTradingType = computed(() => {
+  return form.type === 'PROFIT' || form.type === 'LOSS'
+})
+
+// Dynamic amount label based on type
+const amountLabel = computed(() => {
+  switch(form.type) {
+    case 'PROFIT':
+      return 'Profit Amount'
+    case 'LOSS':
+      return 'Loss Amount'
+    case 'DEPOSIT':
+      return 'Deposit Amount'
+    case 'WITHDRAWAL':
+      return 'Withdrawal Amount'
+    default:
+      return 'Amount'
+  }
+})
+
+const amountPlaceholder = computed(() => {
+  switch(form.type) {
+    case 'PROFIT':
+      return '100.60'
+    case 'LOSS':
+      return '50.25'
+    case 'DEPOSIT':
+      return '1000.00'
+    case 'WITHDRAWAL':
+      return '500.00'
+    default:
+      return '0.00'
+  }
+})
+
+// Handle type change
+const handleTypeChange = () => {
+  if (!isTradingType.value) {
+    form.lot_size = ''
+    form.symbol = ''
+  }
+}
+
 // Get auth token
 const getAuthToken = () => {
   const token = localStorage.getItem('authToken')
@@ -428,17 +499,11 @@ const getAuthToken = () => {
 // ============== CACHE MANAGEMENT ==============
 const saveToCache = (data) => {
   try {
-    // Save data
     localStorage.setItem(CACHE_KEY, JSON.stringify(data))
-    
-    // Save timestamp
     const timestamp = new Date().toISOString()
     localStorage.setItem(CACHE_TIMESTAMP_KEY, timestamp)
-    
-    // Update reactive refs
     lastUpdated.value = timestamp
     cacheStatus.value = { type: 'cached', text: 'Cached data' }
-    
     console.log('✅ Data saved to cache:', data.length, 'transactions')
   } catch (err) {
     console.error('Failed to save to cache:', err)
@@ -447,50 +512,32 @@ const saveToCache = (data) => {
 
 const loadFromCache = () => {
   try {
-    // Get data from localStorage
     const cached = localStorage.getItem(CACHE_KEY)
     const timestamp = localStorage.getItem(CACHE_TIMESTAMP_KEY)
     
-    console.log('Loading from cache:', { hasData: !!cached, hasTimestamp: !!timestamp })
-    
     if (cached && timestamp) {
-      // Parse the data
       const data = JSON.parse(cached)
-      
-      // Update reactive refs
       transactions.value = data
       lastUpdated.value = timestamp
       
-      // Calculate cache age
       const cacheTime = new Date(timestamp).getTime()
       const now = new Date().getTime()
       const ageInMinutes = Math.floor((now - cacheTime) / 60000)
       
-      // Set cache status
       if (ageInMinutes < 5) {
         cacheStatus.value = { type: 'cached', text: 'Cached data' }
       } else {
         cacheStatus.value = { type: 'stale', text: 'Stale data' }
       }
       
-      // Calculate total pages based on data length
       totalPages.value = Math.ceil(data.length / itemsPerPage.value)
-      
       console.log('✅ Loaded from cache:', data.length, 'transactions, age:', ageInMinutes, 'minutes')
       return true
     }
   } catch (err) {
     console.error('Failed to load from cache:', err)
   }
-  
-  console.log('❌ No cache found')
   return false
-}
-
-const clearCache = () => {
-  localStorage.removeItem(CACHE_KEY)
-  localStorage.removeItem(CACHE_TIMESTAMP_KEY)
-  console.log('🗑️ Cache cleared')
 }
 
 // ============== API CALLS ==============
@@ -520,12 +567,8 @@ const fetchFromAPI = async (forceRefresh = false) => {
     
     if (data.code === '200') {
       const content = data.data.content || []
-      
-      // Update reactive refs
       transactions.value = content
       totalPages.value = Math.ceil(content.length / itemsPerPage.value)
-      
-      // Save to cache
       saveToCache(content)
       
       if (forceRefresh) {
@@ -549,18 +592,12 @@ const fetchFromAPI = async (forceRefresh = false) => {
 // ============== INITIALIZATION ==============
 onMounted(() => {
   console.log('🚀 Component mounted')
-  
-  // STEP 1: Try to load from cache first (NO API CALL)
   const hasCache = loadFromCache()
-  
-  // STEP 2: Only fetch from API if NO CACHE exists
   if (!hasCache) {
     console.log('No cache found, fetching from API...')
     fetchFromAPI(false)
   } else {
     console.log('Cache found, using cached data (NO API CALL)')
-    // Optional: You could add a small delay then refresh in background
-    // setTimeout(() => fetchFromAPI(true), 2000)
   }
 })
 
@@ -570,11 +607,15 @@ const createTransaction = async () => {
     const token = getAuthToken()
     
     const payload = {
-      symbol: form.symbol,
       currency: form.currency,
-      lot_size: parseFloat(form.lot_size),
       pnl: parseFloat(form.pnl),
       type: form.type.toLowerCase()
+    }
+    
+    // Add optional fields for trading types
+    if (isTradingType.value) {
+      payload.symbol = form.symbol
+      payload.lot_size = parseFloat(form.lot_size)
     }
     
     if (form.date) {
@@ -595,7 +636,7 @@ const createTransaction = async () => {
     
     if (data.code === '200') {
       notification.success('Transaction created successfully')
-      await fetchFromAPI(true) // Refresh after create
+      await fetchFromAPI(true)
       return true
     } else {
       throw new Error(data.message || 'Failed to create transaction')
@@ -629,7 +670,7 @@ const updateTransaction = async () => {
     
     if (data.code === '200') {
       notification.success('Transaction updated successfully')
-      await fetchFromAPI(true) // Refresh after update
+      await fetchFromAPI(true)
       return true
     } else {
       throw new Error(data.message || 'Failed to update transaction')
@@ -657,7 +698,7 @@ const deleteTransaction = async () => {
     
     if (data.code === '200') {
       notification.success('Transaction deleted successfully')
-      await fetchFromAPI(true) // Refresh after delete
+      await fetchFromAPI(true)
       return true
     } else {
       throw new Error(data.message || 'Failed to delete transaction')
@@ -703,7 +744,7 @@ const resetFilters = () => {
 // ============== COMPUTED ==============
 const filteredTransactions = computed(() => {
   return transactions.value.filter(t => {
-    if (filters.symbol && !t.symbol.toLowerCase().includes(filters.symbol.toLowerCase())) return false
+    if (filters.symbol && !t.symbol?.toLowerCase().includes(filters.symbol.toLowerCase())) return false
     if (filters.type && t.type !== filters.type) return false
     if (filters.currency && t.currency !== filters.currency) return false
     if (filters.date) {
@@ -749,6 +790,24 @@ const formatCurrency = (value) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(value || 0)
+}
+
+const formatTransactionAmount = (transaction) => {
+  if (!transaction) return '-'
+  const amount = transaction.pnl || 0
+  
+  if (transaction.type === 'PROFIT' || transaction.type === 'LOSS') {
+    return formatCurrency(amount)
+  }
+  
+  return `${formatCurrency(amount)} ${transaction.currency}`
+}
+
+const getAmountClass = (transaction) => {
+  if (!transaction) return ''
+  if (transaction.type === 'PROFIT' || transaction.type === 'DEPOSIT') return 'profit'
+  if (transaction.type === 'LOSS' || transaction.type === 'WITHDRAWAL') return 'loss'
+  return ''
 }
 
 const formatDate = (dateString) => {
@@ -806,9 +865,9 @@ const openEditModal = (transaction) => {
   modalMode.value = 'edit'
   selectedTransaction.value = transaction
   form.sn = transaction.sn
-  form.symbol = transaction.symbol
+  form.symbol = transaction.symbol || ''
   form.type = transaction.type
-  form.lot_size = transaction.lot_size
+  form.lot_size = transaction.lot_size || ''
   form.pnl = transaction.pnl
   form.currency = transaction.currency
   form.date = formatDateForInput(transaction.date)
@@ -838,6 +897,17 @@ const closeDeleteModal = () => {
 
 // ============== FORM SUBMISSIONS ==============
 const handleSubmit = async () => {
+  // Validation
+  if (isTradingType.value && !form.symbol) {
+    notification.error('Please select a symbol for trading transactions')
+    return
+  }
+  
+  if (isTradingType.value && !form.lot_size) {
+    notification.error('Please enter lot size for trading transactions')
+    return
+  }
+  
   submitting.value = true
   
   try {
@@ -869,6 +939,47 @@ const handleDelete = async () => {
 </script>
 
 <style scoped>
+.radio-label.deposit {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.radio-label.withdrawal {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dark .radio-label.deposit {
+  background: #1e3a8a;
+  color: #93c5fd;
+}
+
+.dark .radio-label.withdrawal {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+/* Type badge styles for deposit/withdrawal */
+.type-badge.deposit {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.type-badge.withdrawal {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dark .type-badge.deposit {
+  background: #1e3a8a;
+  color: #93c5fd;
+}
+
+.dark .type-badge.withdrawal {
+  background: #78350f;
+  color: #fcd34d;
+}
+
 .transaction-page {
   padding: clamp(12px, 2.25vw, 18px);
   max-width: 1400px;
