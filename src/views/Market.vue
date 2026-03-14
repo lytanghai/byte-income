@@ -18,11 +18,11 @@
       <button 
         class="tab-btn" 
         :class="{ active: activeTab === 'telegram' }"
-        @click="activeTab = 'telegram'"
+        @click="switchToTelegramTab"
       >
         <span class="tab-icon">📱</span>
         Notification
-        <span v-if="unreadAlerts.length > 0" class="tab-badge">{{ unreadAlerts.length }}</span>
+        <span v-if="unreadCount > 0" class="tab-badge">{{ unreadCount }}</span>
       </button>
     </div>
 
@@ -230,13 +230,13 @@
 
       <!-- VPS Controls -->
       <div class="vps-controls">
-        <button class="btn-test" @click="sendTestAlert">
-          <span class="btn-icon">📨</span>
-          Send Test Alert
-        </button>
         <button class="btn-clear" @click="clearAllAlerts" v-if="alerts.length > 0">
           <span class="btn-icon">🗑️</span>
           Clear All
+        </button>
+        <button class="btn-refresh" @click="fetchNotifications" :disabled="notificationsLoading">
+          <span class="refresh-icon" :class="{ 'spin': notificationsLoading }">↻</span>
+          Refresh
         </button>
       </div>
 
@@ -257,6 +257,10 @@
         <div class="stat-card">
           <span class="stat-label">Last 24h</span>
           <span class="stat-value">{{ last24hAlerts }}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">API Unread</span>
+          <span class="stat-value">{{ unreadCount }}</span>
         </div>
       </div>
 
@@ -283,48 +287,55 @@
         />
       </div>
 
-      <!-- Alerts List -->
-      <div class="alerts-container">
-        <div v-if="filteredAlerts.length === 0" class="no-alerts">
-          <span class="no-alerts-icon">📭</span>
-          <p>No alerts match your filters</p>
+      <!-- Loading State -->
+      <div v-if="notificationsLoading && notifications.length === 0" class="loading-state small">
+        <div class="spinner-small"></div>
+        <p>Loading notifications...</p>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="notificationsError" class="error-state small">
+        <p class="error-message">{{ notificationsError }}</p>
+        <button @click="fetchNotifications(true)" class="btn-retry">Retry</button>
+      </div>
+
+      <!-- Notifications List (from API) -->
+      <div v-else class="notifications-section">
+        <div class="section-header">
+          <h3>API Notifications</h3>
+          <span class="last-updated">Last update: {{ formatLastNotificationTime }}</span>
+        </div>
+
+        <div v-if="notifications.length === 0" class="no-notifications">
+          <span class="no-notifications-icon">📭</span>
+          <p>No notifications from API</p>
         </div>
 
         <div 
-          v-for="alert in filteredAlerts" 
-          :key="alert.id"
-          class="alert-card"
-          :class="[alert.severity, { 'unread': !alert.read }]"
-          @click="markAlertAsRead(alert)"
+          v-for="notification in notifications" 
+          :key="notification.id"
+          class="notification-card"
+          :class="{ 'unread': !notification.has_read }"
+          @click="markAsRead(notification)"
         >
-          <div class="alert-icon">
-            <span v-if="alert.type === 'VOLATILITY'">🌪️</span>
-            <span v-else-if="alert.type === 'PRICE_SPIKE'">📈</span>
-            <span v-else-if="alert.type === 'NEWS'">📰</span>
-            <span v-else>⚠️</span>
+          <div class="notification-icon">
+            <span v-if="notification.title.includes('Volatility')">🌪️</span>
+            <span v-else-if="notification.title.includes('Price')">📈</span>
+            <span v-else>📢</span>
           </div>
 
-          <div class="alert-content">
-            <div class="alert-header">
-              <span class="alert-title">{{ alert.title }}</span>
-              <span class="alert-time">{{ formatAlertTime(alert.timestamp) }}</span>
+          <div class="notification-content">
+            <div class="notification-header">
+              <span class="notification-title">{{ notification.title }}</span>
+              <span class="notification-time">{{ formatNotificationTime(notification.sent_at) }}</span>
             </div>
-            <p class="alert-message">{{ alert.message }}</p>
-            <div class="alert-meta">
-              <span class="alert-symbol">{{ alert.symbol }}</span>
-              <span class="alert-severity" :class="alert.severity">{{ alert.severity }}</span>
-              <span class="alert-type">{{ alert.type }}</span>
+            <p class="notification-message">{{ notification.value }}</p>
+            <div v-if="notification.extra" class="notification-extra">
+              {{ notification.extra }}
             </div>
           </div>
 
-          <div v-if="!alert.read" class="unread-indicator"></div>
-        </div>
-
-        <!-- Load More -->
-        <div v-if="hasMoreAlerts" class="load-more">
-          <button @click="loadMoreAlerts" class="btn-load-more">
-            Load More
-          </button>
+          <div v-if="!notification.has_read" class="unread-indicator"></div>
         </div>
       </div>
     </div>
@@ -332,16 +343,28 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useNotification } from '../composables/useNotification'
 
 const notification = useNotification()
 
 // ============== CONFIG ==============
-const ITICK_TOKEN = import.meta.env.VITE_ITICK_TOKEN || 'your_token_here' // Get from .env file
+const ITICK_TOKEN = import.meta.env.VITE_ITICK_TOKEN || 'your_token_here'
+const NOTIFICATION_API_URL = (import.meta.env.VITE_API__NOTIFICATION_BASE_URL || 'http://localhost:8081') + '/notification/fetch-unread'
+const UPDATE_STATUS_API_URL = (import.meta.env.VITE_API__NOTIFICATION_BASE_URL || 'http://localhost:8081') + '/notification/update-status'
 
 // ============== TAB STATE ==============
 const activeTab = ref('chart')
+
+// ============== NOTIFICATION STATE ==============
+const notifications = ref([])
+const notificationsLoading = ref(false)
+const notificationsError = ref(null)
+const vpsConnectionState = ref('connected')
+const vpsConnectionMessage = ref('Connected')
+const lastNotificationFetch = ref(null)
+const processedMessageIds = ref(new Set()) // Track already processed message IDs
+let notificationPollingInterval = null
 
 // ============== GOLD API ==============
 const GOLD_API_URL = 'https://api.gold-api.com/price/XAU'
@@ -370,12 +393,10 @@ const dxyError = ref(null)
 const dxyHistory = ref([])
 const dxyTimestamps = ref([])
 
-let timerInterval = null
+let goldTimerInterval = null
 let countdownInterval = null
 
 // ============== VPS/TELEGRAM STATE ==============
-const vpsConnectionState = ref('connected')
-const vpsConnectionMessage = ref('VPS Connected')
 const lastHeartbeat = ref('Just now')
 
 // Alerts from VPS
@@ -391,52 +412,190 @@ const alertFilter = reactive({
   symbol: ''
 })
 
-// Sample test alerts (for demo)
-const sampleAlerts = [
-  {
-    id: 1,
-    type: 'VOLATILITY',
-    title: 'High Volatility Detected',
-    message: 'Gold volatility spiked to 2.5% in the last minute',
-    symbol: 'XAU/USD',
-    severity: 'danger',
-    timestamp: new Date(Date.now() - 2 * 60000),
-    read: false
-  },
-  {
-    id: 2,
-    type: 'PRICE_SPIKE',
-    title: 'Price Spike Alert',
-    message: 'BTC/USD jumped 3.2% in 5 minutes',
-    symbol: 'BTC/USD',
-    severity: 'warning',
-    timestamp: new Date(Date.now() - 15 * 60000),
-    read: false
-  },
-  {
-    id: 3,
-    type: 'NEWS',
-    title: 'Fed Interest Rate Decision',
-    message: 'Fed announces 0.25% rate cut',
-    symbol: 'DXY',
-    severity: 'info',
-    timestamp: new Date(Date.now() - 45 * 60000),
-    read: true
-  },
-  {
-    id: 4,
-    type: 'VOLATILITY',
-    title: 'Silver Volatility',
-    message: 'XAG/USD showing increased volatility',
-    symbol: 'XAG/USD',
-    severity: 'warning',
-    timestamp: new Date(Date.now() - 120 * 60000),
-    read: true
-  }
-]
+// ============== NOTIFICATION FUNCTIONS ==============
+const fetchNotifications = async (force = false) => {
+  notificationsLoading.value = true
+  notificationsError.value = null
 
-// Initialize with sample alerts
-alerts.value = [...sampleAlerts]
+  try {
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      throw new Error('No authentication token')
+    }
+
+    const response = await fetch(NOTIFICATION_API_URL, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    const result = await response.json()
+
+    if (result.code === '200' && result.data) {
+      const newNotifications = result.data
+      
+      // Filter out already processed messages
+      const uniqueNotifications = newNotifications.filter(n => !processedMessageIds.value.has(n.id))
+      
+      if (uniqueNotifications.length > 0) {
+        notifications.value = [...uniqueNotifications, ...notifications.value]
+        
+        // Add new IDs to processed set
+        uniqueNotifications.forEach(n => processedMessageIds.value.add(n.id))
+      }
+      
+      lastNotificationFetch.value = new Date()
+
+      // Update dashboard badge via localStorage
+      localStorage.setItem('notification_cache', JSON.stringify(notifications.value))
+      
+      // Trigger storage event for other tabs
+      window.dispatchEvent(new Event('storage'))
+
+      vpsConnectionState.value = 'connected'
+      vpsConnectionMessage.value = 'Connected'
+    } else {
+      throw new Error(result.message || 'Failed to fetch notifications')
+    }
+  } catch (err) {
+    notificationsError.value = err.message
+    vpsConnectionState.value = 'disconnected'
+    vpsConnectionMessage.value = 'Disconnected'
+    console.error('Failed to fetch notifications:', err)
+  } finally {
+    notificationsLoading.value = false
+  }
+}
+
+const updateNotificationStatus = async (messageIds) => {
+  if (!messageIds || messageIds.length === 0) return
+
+  try {
+    const token = localStorage.getItem('authToken')
+    if (!token) {
+      throw new Error('No authentication token')
+    }
+
+    const response = await fetch(UPDATE_STATUS_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message_ids: messageIds
+      })
+    })
+
+    const result = await response.json()
+
+    if (result.code === '200') {
+      console.log('✅ Notification status updated successfully')
+      
+      // Remove from processed set
+      messageIds.forEach(id => processedMessageIds.value.delete(id))
+      
+      // Update localStorage
+      localStorage.setItem('notification_cache', JSON.stringify(notifications.value))
+      
+      return true
+    } else {
+      throw new Error(result.message || 'Failed to update notification status')
+    }
+  } catch (err) {
+    console.error('Failed to update notification status:', err)
+    notification.error('Failed to update notification status')
+    return false
+  }
+}
+
+const markAsRead = async (notification) => {
+  if (!notification.has_read) {
+    notification.has_read = true
+    
+    // Call API to update status
+    await updateNotificationStatus([notification.id])
+  }
+}
+
+const markAllAsRead = async () => {
+  const unreadIds = notifications.value
+    .filter(n => !n.has_read)
+    .map(n => n.id)
+  
+  if (unreadIds.length === 0) return
+  
+  // Mark all as read locally
+  notifications.value.forEach(n => n.has_read = true)
+  
+  // Call API to update status
+  const success = await updateNotificationStatus(unreadIds)
+  
+  if (success) {
+    notification.success('All notifications marked as read')
+  }
+}
+
+const switchToTelegramTab = async () => {
+  // Switch tab first
+  activeTab.value = 'telegram'
+  
+  // Get unread message IDs from current notifications
+  const unreadIds = notifications.value
+    .filter(n => !n.has_read)
+    .map(n => n.id)
+  
+  if (unreadIds.length > 0) {
+    console.log('📬 Updating status for unread messages:', unreadIds)
+    
+    // Call API to update status
+    const success = await updateNotificationStatus(unreadIds)
+    
+    if (success) {
+      // Mark as read locally
+      notifications.value.forEach(n => n.has_read = true)
+      
+      // Update localStorage
+      localStorage.setItem('notification_cache', JSON.stringify(notifications.value))
+      window.dispatchEvent(new Event('storage'))
+    }
+  }
+}
+
+const playNotificationSound = () => {
+  try {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+    
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    
+    oscillator.frequency.value = 800
+    gainNode.gain.value = 0.1
+    
+    oscillator.start()
+    oscillator.stop(audioContext.currentTime + 0.1)
+  } catch (err) {
+    console.log('Audio not supported')
+  }
+}
+
+// ============== NOTIFICATION COMPUTED ==============
+const unreadCount = computed(() => {
+  return notifications.value.filter(n => !n.has_read).length
+})
+
+const formatLastNotificationTime = computed(() => {
+  if (!lastNotificationFetch.value) return 'Never'
+  const diff = Date.now() - lastNotificationFetch.value
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  return `${Math.floor(mins / 60)}h ago`
+})
 
 // ============== GOLD FUNCTIONS ==============
 const fetchGoldPrice = async () => {
@@ -713,29 +872,6 @@ const last24hAlerts = computed(() => {
   return alerts.value.filter(a => new Date(a.timestamp) > oneDayAgo).length
 })
 
-const sendTestAlert = () => {
-  const types = ['VOLATILITY', 'PRICE_SPIKE', 'NEWS']
-  const severities = ['danger', 'warning', 'info']
-  const symbols = ['XAU/USD', 'BTC/USD', 'EUR/USD', 'DXY', 'XAG/USD']
-  
-  const newAlert = {
-    id: Date.now(),
-    type: types[Math.floor(Math.random() * types.length)],
-    title: `Test Alert ${Math.floor(Math.random() * 100)}`,
-    message: 'This is a test alert from VPS',
-    symbol: symbols[Math.floor(Math.random() * symbols.length)],
-    severity: severities[Math.floor(Math.random() * severities.length)],
-    timestamp: new Date(),
-    read: false
-  }
-  
-  alerts.value.unshift(newAlert)
-  vpsConnectionState.value = 'connected'
-  vpsConnectionMessage.value = 'VPS Connected'
-  lastHeartbeat.value = 'Just now'
-  
-  notification.success('Test alert sent successfully')
-}
 
 const clearAllAlerts = () => {
   alerts.value = []
@@ -752,8 +888,8 @@ const loadMoreAlerts = () => {
 
 // ============== TIMERS ==============
 const startTimers = () => {
-  // Fetch every 60 seconds
-  timerInterval = setInterval(() => {
+  // Fetch gold every 60 seconds
+  goldTimerInterval = setInterval(() => {
     fetchGoldPrice()
     fetchDXYPrice()
   }, 60000)
@@ -773,6 +909,11 @@ const startTimers = () => {
     setTimeout(() => {
       lastHeartbeat.value = '30s ago'
     }, 5000)
+  }, 30000)
+
+  // Fetch notifications every 30 seconds
+  notificationPollingInterval = setInterval(() => {
+    fetchNotifications()
   }, 30000)
 }
 
@@ -851,20 +992,94 @@ const formatAlertTime = (timestamp) => {
   return date.toLocaleDateString()
 }
 
+const formatNotificationTime = (timestamp) => {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now - date
+  const diffMins = Math.floor(diffMs / 60000)
+  
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`
+  return date.toLocaleDateString()
+}
+
+// ============== WATCHERS ==============
+watch(activeTab, (newTab) => {
+  if (newTab === 'telegram') {
+    // Get unread message IDs
+    const unreadIds = notifications.value
+      .filter(n => !n.has_read)
+      .map(n => n.id)
+    
+    if (unreadIds.length > 0) {
+      // Call API to update status
+      updateNotificationStatus(unreadIds).then(success => {
+        if (success) {
+          // Mark as read locally
+          notifications.value.forEach(n => n.has_read = true)
+          
+          // Update localStorage
+          localStorage.setItem('notification_cache', JSON.stringify(notifications.value))
+          window.dispatchEvent(new Event('storage'))
+        }
+      })
+    }
+  }
+})
+
 // ============== LIFECYCLE ==============
 onMounted(() => {
   fetchGoldPrice()
   fetchDXYPrice()
+  fetchNotifications()
   startTimers()
+
+  // Load processed message IDs from localStorage
+  const savedIds = localStorage.getItem('processed_message_ids')
+  if (savedIds) {
+    try {
+      const ids = JSON.parse(savedIds)
+      processedMessageIds.value = new Set(ids)
+    } catch (err) {
+      console.error('Failed to load processed message IDs:', err)
+    }
+  }
+
+  // Listen for storage events (for cross-tab sync)
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'notification_cache') {
+      try {
+        const cached = JSON.parse(e.newValue)
+        if (cached) {
+          notifications.value = cached
+        }
+      } catch (err) {
+        console.error('Failed to parse notification cache:', err)
+      }
+    } else if (e.key === 'processed_message_ids') {
+      try {
+        const ids = JSON.parse(e.newValue)
+        processedMessageIds.value = new Set(ids)
+      } catch (err) {
+        console.error('Failed to parse processed message IDs:', err)
+      }
+    }
+  })
 })
 
 onUnmounted(() => {
-  if (timerInterval) clearInterval(timerInterval)
+  if (goldTimerInterval) clearInterval(goldTimerInterval)
   if (countdownInterval) clearInterval(countdownInterval)
+  if (notificationPollingInterval) clearInterval(notificationPollingInterval)
+  
+  // Save processed message IDs to localStorage
+  localStorage.setItem('processed_message_ids', JSON.stringify([...processedMessageIds.value]))
 })
 </script>
 
 <style scoped>
+/* Keep ALL your existing styles exactly as they were */
 .market-page {
   padding: clamp(12px, 2.25vw, 18px);
   max-width: 1400px;
@@ -1071,6 +1286,289 @@ onUnmounted(() => {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* VPS Status (Telegram Tab) */
+.vps-status {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 8px 16px;
+  margin-bottom: 18px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.dark .vps-status {
+  background: #1f2937;
+}
+
+.vps-status.connected {
+  border-left: 3px solid #10b981;
+}
+
+.vps-status.disconnected {
+  border-left: 3px solid #ef4444;
+}
+
+.last-heartbeat {
+  font-size: 10px;
+  color: #6b7280;
+  margin-left: auto;
+}
+
+/* VPS Controls */
+.vps-controls {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+
+
+.btn-clear {
+  padding: 8px 16px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-clear:hover {
+  background: #dc2626;
+}
+
+.btn-clear-small {
+  padding: 4px 8px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.btn-icon {
+  font-size: 14px;
+}
+
+/* VPS Stats */
+.vps-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.stat-card {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.dark .stat-card {
+  background: #374151;
+}
+
+.stat-label {
+  display: block;
+  font-size: 8px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.dark .stat-value {
+  color: white;
+}
+
+/* Alert Filters */
+.alert-filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.filter-select,
+.filter-input {
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 10px;
+  background: white;
+  color: #1f2937;
+  min-width: 120px;
+}
+
+.dark .filter-select,
+.dark .filter-input {
+  background: #374151;
+  border-color: #4b5563;
+  color: white;
+}
+
+.filter-input {
+  flex: 1;
+  min-width: 150px;
+}
+
+/* Section Header */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.section-header h3 {
+  margin: 0;
+  font-size: 13px;
+  color: #1f2937;
+}
+
+.dark .section-header h3 {
+  color: white;
+}
+
+/* Notifications Section */
+.notifications-section {
+  margin-bottom: 24px;
+}
+
+.no-notifications {
+  text-align: center;
+  padding: 30px;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.dark .no-notifications {
+  background: #374151;
+}
+
+.no-notifications-icon {
+  font-size: 30px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.no-notifications p {
+  margin: 0;
+  font-size: 11px;
+}
+
+.notification-card {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 8px;
+  background: #f9fafb;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.notification-card:hover {
+  transform: translateX(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.notification-card.unread {
+  background: #dbeafe;
+}
+
+.dark .notification-card {
+  background: #374151;
+}
+
+.dark .notification-card.unread {
+  background: #1e3a8a;
+}
+
+.notification-icon {
+  font-size: 16px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dark .notification-icon {
+  background: #4b5563;
+}
+
+.notification-content {
+  flex: 1;
+}
+
+.notification-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.notification-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.dark .notification-title {
+  color: white;
+}
+
+.notification-time {
+  font-size: 8px;
+  color: #6b7280;
+}
+
+.notification-message {
+  margin: 0 0 4px 0;
+  font-size: 10px;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.dark .notification-message {
+  color: #9ca3af;
+}
+
+.notification-extra {
+  font-size: 9px;
+  color: #6b7280;
+  background: #e5e7eb;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.dark .notification-extra {
+  background: #4b5563;
+  color: #9ca3af;
 }
 
 /* Charts Grid Layout */
@@ -1442,141 +1940,17 @@ onUnmounted(() => {
   color: #6b7280;
 }
 
-/* VPS Status (Telegram Tab) */
-.vps-status {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  padding: 8px 16px;
-  margin-bottom: 18px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+/* Alerts Section */
+.alerts-section {
+  margin-top: 24px;
 }
 
-.dark .vps-status {
-  background: #1f2937;
-}
-
-.vps-status.connected {
-  border-left: 3px solid #10b981;
-}
-
-.vps-status.disconnected {
-  border-left: 3px solid #ef4444;
-}
-
-.last-heartbeat {
-  font-size: 10px;
-  color: #6b7280;
-  margin-left: auto;
-}
-
-/* VPS Controls */
-.vps-controls {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 18px;
-}
-
-.btn-test {
-  padding: 8px 16px;
-  background: #10b981;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btn-test:hover {
-  background: #059669;
-}
-
-.btn-clear {
-  padding: 8px 16px;
-  background: #ef4444;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.btn-clear:hover {
-  background: #dc2626;
-}
-
-.btn-icon {
-  font-size: 14px;
-}
-
-/* VPS Stats */
-.vps-stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin-bottom: 18px;
-}
-
-.stat-card {
-  background: #f9fafb;
-  border-radius: 8px;
-  padding: 12px;
-  text-align: center;
-}
-
-.dark .stat-card {
-  background: #374151;
-}
-
-/* Alert Filters */
-.alert-filters {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 18px;
-  flex-wrap: wrap;
-}
-
-.filter-select,
-.filter-input {
-  padding: 6px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  font-size: 10px;
-  background: white;
-  color: #1f2937;
-  min-width: 120px;
-}
-
-.dark .filter-select,
-.dark .filter-input {
-  background: #374151;
-  border-color: #4b5563;
-  color: white;
-}
-
-.filter-input {
-  flex: 1;
-  min-width: 150px;
-}
-
-/* Alerts Container */
 .alerts-container {
-  max-height: 500px;
+  max-height: 300px;
   overflow-y: auto;
   padding-right: 4px;
 }
 
-/* Alert Cards */
 .alert-card {
   display: flex;
   gap: 12px;
@@ -1784,6 +2158,10 @@ onUnmounted(() => {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
+.loading-state.small {
+  padding: 30px;
+}
+
 .dark .loading-state {
   background: #1f2937;
 }
@@ -1798,6 +2176,17 @@ onUnmounted(() => {
   animation: spin 1s linear infinite;
 }
 
+.spinner-small {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f3f4f6;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-bottom: 8px;
+}
+
 /* Error State */
 .error-state {
   text-align: center;
@@ -1805,6 +2194,10 @@ onUnmounted(() => {
   background: white;
   border-radius: 8px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.error-state.small {
+  padding: 30px;
 }
 
 .dark .error-state {
@@ -1894,6 +2287,10 @@ onUnmounted(() => {
   .filter-input {
     width: 100%;
   }
+  
+  .vps-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 @media (max-width: 480px) {
@@ -1906,7 +2303,7 @@ onUnmounted(() => {
   }
   
   .vps-stats {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
   }
   
   .price-change {
@@ -1917,11 +2314,13 @@ onUnmounted(() => {
     font-size: 9px;
   }
   
-  .alert-card {
+  .alert-card,
+  .notification-card {
     flex-direction: column;
   }
   
-  .alert-icon {
+  .alert-icon,
+  .notification-icon {
     align-self: flex-start;
   }
   
@@ -1941,7 +2340,6 @@ onUnmounted(() => {
 @media (hover: none) and (pointer: coarse) {
   .tab-btn,
   .btn-refresh,
-  .btn-test,
   .btn-clear,
   .btn-load-more,
   .btn-retry,
@@ -1955,11 +2353,13 @@ onUnmounted(() => {
     min-height: 6px;
   }
   
-  .alert-card {
+  .alert-card,
+  .notification-card {
     padding: 15px;
   }
   
-  .alert-icon {
+  .alert-icon,
+  .notification-icon {
     width: 40px;
     height: 40px;
     font-size: 20px;

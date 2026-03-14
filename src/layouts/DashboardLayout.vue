@@ -26,9 +26,9 @@
                         <!-- <span class="menu-icon">💡</span> -->
                         <span class="menu-text">Insight</span>
                     </RouterLink>
-                    <RouterLink @click="closeSidebar" to="/market">
-                        <!-- <span class="menu-icon">🏪</span> -->
+                    <RouterLink @click="closeSidebar" to="/market" class="notification-link">
                         <span class="menu-text">Market</span>
+                        <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount }}</span>
                     </RouterLink>
                     <RouterLink @click="closeSidebar" to="/report">
                         <!-- <span class="menu-icon">📄</span> -->
@@ -88,6 +88,12 @@
                 </div>
 
                 <div class="header-right">
+                    <!-- Notification Bell (Mobile) -->
+                    <button class="notification-bell mobile-only" @click="goToMarket">
+                        <span class="bell-icon">🔔</span>
+                        <span v-if="unreadCount > 0" class="bell-badge">{{ unreadCount }}</span>
+                    </button>
+
                     <!-- Theme toggle -->
                     <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
                         {{ theme === 'dark' ? '🌙' : '☀️' }}
@@ -220,6 +226,35 @@
     font-weight: 500;
 }
 
+/* Notification link with badge */
+.notification-link {
+    position: relative;
+}
+
+.notification-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: #ef4444;
+    color: white;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
 .menu-icon {
     font-size: 1.2rem;
     min-width: 24px;
@@ -347,6 +382,42 @@
 
 .menu-btn:hover {
     background: rgba(0, 0, 0, 0.05);
+}
+
+/* Notification bell for mobile */
+.notification-bell {
+    position: relative;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    color: var(--text-main);
+}
+
+.notification-bell:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.bell-icon {
+    font-size: 1.25rem;
+}
+
+.bell-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: #ef4444;
+    color: white;
+    font-size: 9px;
+    font-weight: 600;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Profile section */
@@ -610,6 +681,14 @@
     .submenu {
         margin-left: 32px;
     }
+
+    .notification-badge {
+        top: -3px;
+        right: -3px;
+        min-width: 16px;
+        height: 16px;
+        font-size: 9px;
+    }
 }
 
 /* Small mobile styles (up to 480px) */
@@ -704,7 +783,7 @@
 </style>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
@@ -714,6 +793,11 @@ const theme = ref('light')
 const settingOpen = ref(false)
 const username = ref('')
 const isMobileProfileOpen = ref(false)
+
+// Notification state
+const unreadCount = ref(0)
+const notifications = ref([])
+let pollingInterval = null
 
 // Compute current page title for mobile
 const currentPageTitle = computed(() => {
@@ -749,14 +833,154 @@ const toggleMobileProfile = () => {
     }
 }
 
+const goToMarket = () => {
+    router.push('/market')
+    isMobileProfileOpen.value = false
+    isSidebarOpen.value = false
+}
+
 const handleLogout = () => {
     // Clear authentication data
     localStorage.removeItem('isAuthenticated')
     localStorage.removeItem('rememberMe')
     localStorage.removeItem('userData')
+    localStorage.removeItem('notification_cache') // Clear notification cache
+    localStorage.removeItem('notification_timestamp')
+    
+    // Stop polling
+    if (pollingInterval) {
+        clearInterval(pollingInterval)
+    }
     
     // Redirect to login page
     router.push('/login')
+}
+
+// ============== NOTIFICATION POLLING ==============
+const NOTIFICATION_API_URL = (import.meta.env.VITE_API__NOTIFICATION_BASE_URL || 'http://localhost:8081') + '/notification/fetch-unread'
+const NOTIFICATION_CACHE_KEY = 'notification_cache'
+const NOTIFICATION_TIMESTAMP_KEY = 'notification_timestamp'
+
+// Load cached notifications
+const loadNotificationsFromCache = () => {
+    try {
+        const cached = localStorage.getItem(NOTIFICATION_CACHE_KEY)
+        
+        if (cached) {
+            const data = JSON.parse(cached)
+            notifications.value = data
+            // Count unread notifications
+            const unread = data.filter(n => !n.has_read).length
+            unreadCount.value = unread
+            console.log('✅ Loaded notifications from cache:', data.length, 'unread:', unread)
+            return true
+        }
+    } catch (err) {
+        console.error('Failed to load notifications from cache:', err)
+    }
+    return false
+}
+
+// Save notifications to cache
+const saveNotificationsToCache = (data) => {
+    try {
+        localStorage.setItem(NOTIFICATION_CACHE_KEY, JSON.stringify(data))
+        localStorage.setItem(NOTIFICATION_TIMESTAMP_KEY, new Date().toISOString())
+        
+        // Update unread count
+        const unread = data.filter(n => !n.has_read).length
+        unreadCount.value = unread
+    } catch (err) {
+        console.error('Failed to save notifications to cache:', err)
+    }
+}
+
+// Update unread count from cache (called when storage changes)
+const updateUnreadCountFromCache = () => {
+    try {
+        const cached = localStorage.getItem(NOTIFICATION_CACHE_KEY)
+        if (cached) {
+            const data = JSON.parse(cached)
+            const unread = data.filter(n => !n.has_read).length
+            unreadCount.value = unread
+            notifications.value = data
+            console.log('🔄 Updated unread count from cache:', unread)
+        }
+    } catch (err) {
+        console.error('Failed to update from cache:', err)
+    }
+}
+
+// Fetch unread notifications
+const fetchUnreadNotifications = async () => {
+    const token = localStorage.getItem('authToken')
+    if (!token) return
+
+    try {
+        const response = await fetch(NOTIFICATION_API_URL, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        })
+
+        const result = await response.json()
+
+        if (result.code === '200' && result.data) {
+            const newNotifications = result.data
+            const newUnreadCount = newNotifications.filter(n => !n.has_read).length
+            
+            // Check if count changed
+            if (newUnreadCount !== unreadCount.value) {
+                console.log(`📬 Notification count changed: ${unreadCount.value} → ${newUnreadCount}`)
+                
+                // Play sound only if there are new unread notifications
+                if (newUnreadCount > unreadCount.value && newUnreadCount > 0) {
+                    playNotificationSound()
+                }
+            }
+            
+            notifications.value = newNotifications
+            unreadCount.value = newUnreadCount
+            saveNotificationsToCache(newNotifications)
+        }
+    } catch (err) {
+        console.error('Failed to fetch notifications:', err)
+    }
+}
+
+// Play notification sound (optional)
+const playNotificationSound = () => {
+    try {
+        // Create a simple beep sound
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
+        const oscillator = audioContext.createOscillator()
+        const gainNode = audioContext.createGain()
+        
+        oscillator.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+        
+        oscillator.frequency.value = 800
+        gainNode.gain.value = 0.1
+        
+        oscillator.start()
+        oscillator.stop(audioContext.currentTime + 0.1)
+    } catch (err) {
+        console.log('Audio not supported')
+    }
+}
+
+// Start polling every 30 seconds
+const startPolling = () => {
+    // Load from cache first
+    // loadNotificationsFromCache()
+    
+    // Fetch immediately
+    // fetchUnreadNotifications()
+    
+    // Then poll every 30 seconds
+    // pollingInterval = setInterval(fetchUnreadNotifications, 30000) // 30 seconds
 }
 
 /* Theme toggle */
@@ -764,6 +988,15 @@ const toggleTheme = () => {
     theme.value = theme.value === 'light' ? 'dark' : 'light'
     localStorage.setItem('theme', theme.value)
 }
+
+// Watch for route changes to update unread count when navigating to market
+watch(() => route.path, (newPath) => {
+    if (newPath === '/market') {
+        // When navigating to market, we'll let the market component handle marking as read
+        // But we should update our local cache when we return
+        setTimeout(updateUnreadCountFromCache, 500)
+    }
+})
 
 onMounted(() => {
     const savedTheme = localStorage.getItem('theme')
@@ -780,6 +1013,16 @@ onMounted(() => {
         }
     }
 
+    // Start notification polling
+    startPolling()
+
+    // Listen for storage events (for cross-tab sync)
+    window.addEventListener('storage', (e) => {
+        if (e.key === NOTIFICATION_CACHE_KEY) {
+            updateUnreadCountFromCache()
+        }
+    })
+
     // Close sidebar when route changes on mobile
     router.afterEach(() => {
         if (window.innerWidth <= 768) {
@@ -795,5 +1038,15 @@ onMounted(() => {
             isMobileProfileOpen.value = false
         }
     })
+})
+
+onUnmounted(() => {
+    // Clean up polling interval
+    if (pollingInterval) {
+        clearInterval(pollingInterval)
+    }
+    
+    // Remove storage listener
+    window.removeEventListener('storage', updateUnreadCountFromCache)
 })
 </script>
