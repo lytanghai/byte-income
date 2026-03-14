@@ -622,7 +622,7 @@ const createTransaction = async () => {
     // Add optional date if provided
     if (form.date) {
       const [year, month, day] = form.date.split('-')
-      payload.inp_date = `${month}/${day}/${year}`
+      payload.inp_date = `${day}/${month}/${year}`
     }
     
     console.log('📤 Creating transaction with payload:', payload)
