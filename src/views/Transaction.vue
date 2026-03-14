@@ -444,7 +444,7 @@ const filters = reactive({
 
 // Check if selected type is trading (PROFIT/LOSS)
 const isTradingType = computed(() => {
-  return form.type === 'PROFIT' || form.type === 'LOSS'
+  return form.type === 'PROFIT' || form.type === 'LOSS' || form.type === 'DEPOSIT' || form.type === 'WITHDRAWAL'
 })
 
 // Dynamic amount label based on type
@@ -606,22 +606,26 @@ const createTransaction = async () => {
   try {
     const token = getAuthToken()
     
+    // Set default lot_size to 0.01 if not provided or if it's empty
+    const lotSize = form.lot_size && !isNaN(parseFloat(form.lot_size)) 
+      ? parseFloat(form.lot_size) 
+      : 0.01
+    
     const payload = {
-      currency: form.currency,
-      pnl: parseFloat(form.pnl),
-      type: form.type.toLowerCase()
+      symbol: form.symbol || '', // Include symbol (required)
+      currency: form.currency,    // Required
+      lot_size: lotSize,          // Required with default 0.01
+      pnl: parseFloat(form.pnl),  // Required
+      type: form.type.toLowerCase() // Required
     }
     
-    // Add optional fields for trading types
-    if (isTradingType.value) {
-      payload.symbol = form.symbol
-      payload.lot_size = parseFloat(form.lot_size)
-    }
-    
+    // Add optional date if provided
     if (form.date) {
       const [year, month, day] = form.date.split('-')
       payload.inp_date = `${month}/${day}/${year}`
     }
+    
+    console.log('📤 Creating transaction with payload:', payload)
     
     const response = await fetch(`${API_BASE_URL}/create`, {
       method: 'POST',
