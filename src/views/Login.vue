@@ -43,7 +43,7 @@
         <div class="logo-wrapper">
           <img src="../assets/trading.gif" width="60" alt="Logo" class="logo-gif" />
         </div>
-        <h1 class="login-title">Byte Income</h1>
+        <h1 class="login-title">DataBae</h1>
         <p class="login-subtitle">Trading Data Management System</p>
       </div>
 
