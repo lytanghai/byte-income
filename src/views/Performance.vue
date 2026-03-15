@@ -24,7 +24,7 @@
         <div class="stat-card">
           <span class="stat-label">Total P&L</span>
           <span class="stat-value" :class="getPnLClass(monthlyStats.totalPnL)">
-            {{ formatCurrency(monthlyStats.totalPnL) }}
+            {{ (monthlyStats.totalPnL / 100).toFixed(2) }}
           </span>
         </div>
         <div class="stat-card">
@@ -35,13 +35,13 @@
           <span class="stat-label">Loss Days</span>
           <span class="stat-value loss">{{ monthlyStats.lossDays }}</span>
         </div>
-        <div class="stat-card desktop-only">
+        <div class="stat-card">
           <span class="stat-label">Best Day</span>
-          <span class="stat-value profit">{{ formatCurrency(monthlyStats.bestDay) }}</span>
+          <span class="stat-value profit">{{ (monthlyStats.bestDay).toFixed(2) }}</span>
         </div>
-        <div class="stat-card desktop-only">
+        <div class="stat-card">
           <span class="stat-label">Worst Day</span>
-          <span class="stat-value loss">{{ formatCurrency(monthlyStats.worstDay) }}</span>
+          <span class="stat-value loss">{{ (monthlyStats.worstDay).toFixed(2) }}</span>
         </div>
       </div>
     </div>
@@ -113,7 +113,7 @@
           <h2>Transaction History</h2>
           <button class="filter-toggle mobile-only" @click="toggleFilters" v-if="!showFilters">
             <span class="filter-icon">🔍</span>
-            Filters
+            <span style="color:#000"> Filters </span>
           </button>
         </div>
 

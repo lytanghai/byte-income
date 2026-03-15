@@ -293,7 +293,7 @@
 
           <!-- Lot Size Field (only for PROFIT/LOSS) -->
           <div v-if="isTradingType" class="form-group">
-            <label for="lot_size">Lot Size *</label>
+            <label for="lot_size">Lot Size</label>
             <input 
               type="number" 
               id="lot_size"
@@ -447,7 +447,7 @@ const filters = reactive({
 
 // Check if selected type is trading (PROFIT/LOSS)
 const isTradingType = computed(() => {
-  return form.type === 'PROFIT' || form.type === 'LOSS' || form.type === 'DEPOSIT' || form.type === 'WITHDRAWAL'
+  return form.type === 'PROFIT' || form.type === 'LOSS'
 })
 
 // Dynamic amount label based on type
