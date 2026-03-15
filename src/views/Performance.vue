@@ -441,12 +441,6 @@ const formatCurrency = (value) => {
   }).format(value)
 }
 
-const formatPnL = (value) => {
-  if (value === 0) return '-'
-  if (value > 0) return `+${value.toFixed(2)}`
-  return value.toFixed(2)
-}
-
 const formatTransactionDate = (dateString) => {
   if (!dateString) return 'N/A'
   const date = new Date(dateString)

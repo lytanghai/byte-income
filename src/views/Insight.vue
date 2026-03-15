@@ -19,12 +19,30 @@
 
         <!-- Category Filter -->
         <div class="filter-group">
-          <label class="filter-label">Category</label>
-          <select v-model="filters.category" @change="applyFilters" class="filter-select">
-            <option value="">All Categories</option>
-            <option v-for="category in categories" :key="category" :value="category">
-              {{ category }}
-            </option>
+          <label class="filter-label">Category *</label>
+          <select v-model="filters.category" class="filter-select" :class="{ 'error': categoryError }">
+            <option value="">Select Category</option>
+            <option value="GENERAL">General</option>
+            <option value="GOLD">Gold</option>
+            <option value="DXY">DXY (Dollar Index)</option>
+            <option value="WAR">War</option>
+            <option value="CRIME">Crime</option>
+            <option value="US_ECONOMIC">US Economic</option>
+            <option value="OIL">Oil</option>
+          </select>
+          <small v-if="categoryError" class="error-hint">{{ categoryError }}</small>
+        </div>
+
+        <!-- Last Updated Filter -->
+        <div class="filter-group">
+          <label class="filter-label">Last Updated</label>
+          <select v-model="filters.last_updated" class="filter-select">
+            <option value="">Any Time</option>
+            <option value="1h">Last hour</option>
+            <option value="6h">Last 6 hours</option>
+            <option value="12h">Last 12 hours</option>
+            <option value="24h">Last 24 hours</option>
+            <option value="7d">Last 7 days</option>
           </select>
         </div>
 
@@ -84,7 +102,7 @@
             <input 
               type="text" 
               v-model="filters.keyword" 
-              @input="debouncedApplyFilters"
+              @keyup.enter="handleSearch"
               placeholder="Search in title..."
               class="keyword-input"
             />
@@ -103,13 +121,30 @@
           </select>
         </div>
 
+        <!-- Search Button -->
+        <div class="filter-group">
+          <button 
+            @click="handleSearch" 
+            class="btn-search" 
+            :disabled="!isSearchValid || newsLoading"
+          >
+            <span v-if="newsLoading" class="spinner-small"></span>
+            <span class="btn-icon">🔍</span>
+            {{ newsLoading ? 'Searching...' : 'Search News' }}
+          </button>
+        </div>
+
         <!-- Active Filters -->
         <div v-if="hasActiveFilters" class="active-filters">
           <div class="active-filters-title">Active Filters:</div>
           <div class="filter-tags">
             <span v-if="filters.category" class="filter-tag">
               {{ filters.category }}
-              <button @click="filters.category = ''; applyFilters()">✕</button>
+              <button @click="filters.category = ''; validateCategory()">✕</button>
+            </span>
+            <span v-if="filters.last_updated" class="filter-tag">
+              Last {{ filters.last_updated }}
+              <button @click="filters.last_updated = ''">✕</button>
             </span>
             <span v-if="filters.market" class="filter-tag">
               {{ filters.market }}
@@ -181,20 +216,31 @@
 
         <!-- News Feed Tab -->
         <div v-show="activeTab === 'news'" class="news-feed">
+          <!-- Initial State - No Search Yet -->
+          <div v-if="!hasSearched" class="initial-state">
+            <div class="initial-icon">🔍</div>
+            <h3>Search for News</h3>
+            <p>Select a category and click Search to find relevant news articles</p>
+            <div class="search-hint">
+              <span class="hint-item">• Category is required</span>
+              <span class="hint-item">• You can add filters for better results</span>
+            </div>
+          </div>
+
           <!-- Loading State -->
-          <div v-if="loading && allNews.length === 0" class="loading-state">
+          <div v-else-if="newsLoading && allNews.length === 0" class="loading-state">
             <div class="spinner"></div>
-            <p>Loading news...</p>
+            <p>Searching news...</p>
           </div>
 
           <!-- Error State -->
           <div v-else-if="error" class="error-state">
             <p class="error-message">{{ error }}</p>
-            <button @click="fetchNews(true)" class="btn-retry">Retry</button>
+            <button @click="handleSearch" class="btn-retry">Retry</button>
           </div>
 
           <!-- News List -->
-          <div v-else class="news-list">
+          <div v-else-if="allNews.length > 0" class="news-list">
             <div v-if="filteredNews.length === 0" class="no-data">
               No news articles match your filters
             </div>
@@ -250,7 +296,7 @@
             </div>
 
             <!-- Pagination -->
-            <div v-if="filteredNews.length > 0" class="pagination">
+            <div class="pagination">
               <button 
                 @click="currentPage--" 
                 :disabled="currentPage === 1"
@@ -269,6 +315,13 @@
                 Next →
               </button>
             </div>
+          </div>
+
+          <!-- No Results State -->
+          <div v-else-if="hasSearched && allNews.length === 0" class="no-results">
+            <div class="no-results-icon">📭</div>
+            <h3>No News Found</h3>
+            <p>Try adjusting your filters or search for a different category</p>
           </div>
         </div>
 
@@ -292,8 +345,8 @@
               No economic events match your filters
             </div>
 
-            <!-- Date Group - Sorted Descending (Present to Past) -->
-            <div v-for="(group, date) in sortedEventGroups" :key="date" class="event-date-group">
+            <!-- Date Group - Sorted Ascending (Tomorrow first, then next days) -->
+            <div v-for="(group, date) in sortedEventGroupsAsc" :key="date" class="event-date-group">
               <div class="event-date-header">
                 <h4>{{ formatEventDate(date) }}</h4>
                 <span class="event-count">{{ group.length }} events</span>
@@ -368,7 +421,7 @@ const EVENTS_TIMESTAMP_KEY = 'insight_events_timestamp'
 // State
 const allNews = ref([])
 const events = ref([])
-const loading = ref(false)
+const newsLoading = ref(false)
 const eventsLoading = ref(false)
 const error = ref(null)
 const eventsError = ref(null)
@@ -376,17 +429,34 @@ const currentPage = ref(1)
 const itemsPerPage = ref(10)
 const activeTab = ref('news')
 const currentTime = ref(new Date())
+const hasSearched = ref(false)
+const categoryError = ref('')
 let timerInterval = null
 
 // Filters
 const filters = reactive({
   category: '',
+  last_updated: '',
   market: '',
   impact: '',
   country: '',
   keyword: '',
   source: ''
 })
+
+// ============== VALIDATION ==============
+const isSearchValid = computed(() => {
+  return filters.category && filters.category.trim() !== ''
+})
+
+const validateCategory = () => {
+  if (!filters.category) {
+    categoryError.value = 'Category is required'
+    return false
+  }
+  categoryError.value = ''
+  return true
+}
 
 // ============== CACHE MANAGEMENT ==============
 const saveNewsToCache = (data) => {
@@ -395,6 +465,7 @@ const saveNewsToCache = (data) => {
       data: data,
       filters: {
         category: filters.category,
+        last_updated: filters.last_updated,
         market: filters.market,
         impact: filters.impact,
         keyword: filters.keyword,
@@ -418,6 +489,7 @@ const loadNewsFromCache = () => {
       
       // Check if filters match
       if (cacheData.filters.category === filters.category &&
+          cacheData.filters.last_updated === filters.last_updated &&
           cacheData.filters.market === filters.market &&
           cacheData.filters.impact === filters.impact &&
           cacheData.filters.keyword === filters.keyword &&
@@ -484,7 +556,6 @@ const startTimer = () => {
 }
 
 onMounted(() => {
-  fetchNews()
   fetchEvents()
   startTimer()
 })
@@ -522,7 +593,7 @@ const countries = computed(() => {
 // Filtered news
 const filteredNews = computed(() => {
   return allNews.value.filter(news => {
-    // Category filter
+    // Category filter (already applied in search)
     if (filters.category && news.category !== filters.category) return false
     
     // Market filter
@@ -612,8 +683,8 @@ const getCountdown = (dateTime) => {
   }
 }
 
-// Group and sort events by date (descending)
-const sortedEventGroups = computed(() => {
+// Group and sort events by date (ascending - tomorrow first)
+const sortedEventGroupsAsc = computed(() => {
   // First, group events by date
   const groups = {}
   
@@ -634,11 +705,11 @@ const sortedEventGroups = computed(() => {
     })
   })
   
-  // Sort dates in descending order (present to past)
+  // Sort dates in ascending order (tomorrow first, then next days)
   const sortedDates = Object.keys(groups).sort((a, b) => {
     const dateA = parseEventDate(a + ' 00:00:00')
     const dateB = parseEventDate(b + ' 00:00:00')
-    return dateB - dateA // Descending order
+    return dateA - dateB // Ascending order (earlier dates first)
   })
   
   // Create new object with sorted dates
@@ -680,12 +751,34 @@ const highImpactEvents = computed(() =>
 
 const hasActiveFilters = computed(() => {
   return filters.category || 
+         filters.last_updated ||
          filters.market || 
          filters.impact || 
          filters.country ||
          filters.keyword || 
          filters.source
 })
+
+// ============== SEARCH FUNCTION ==============
+const handleSearch = async () => {
+  // Validate category
+  if (!validateCategory()) {
+    notification.error('Please select a category')
+    return
+  }
+
+  hasSearched.value = true
+  currentPage.value = 1
+  
+  // Try to load from cache first
+  const loaded = loadNewsFromCache()
+  if (loaded) {
+    return
+  }
+  
+  // If not in cache, fetch from API
+  await fetchNews(true)
+}
 
 // Helper functions
 const formatTimeAgo = (dateString) => {
@@ -788,11 +881,15 @@ const clearKeyword = () => {
 
 const resetFilters = () => {
   filters.category = ''
+  filters.last_updated = ''
   filters.market = ''
   filters.impact = ''
   filters.country = ''
   filters.keyword = ''
   filters.source = ''
+  categoryError.value = ''
+  hasSearched.value = false
+  allNews.value = []
   applyFilters()
 }
 
@@ -808,27 +905,23 @@ const getAuthToken = () => {
 
 // Fetch news
 const fetchNews = async (forceRefresh = false) => {
-  // Try to load from cache first (NO API CALL)
-  if (!forceRefresh) {
-    const loaded = loadNewsFromCache()
-    if (loaded) {
-      return
-    }
-  }
-  
-  loading.value = true
+  newsLoading.value = true
   error.value = null
   
   try {
     const token = getAuthToken()
     
+    // Build query parameters
     const params = new URLSearchParams()
     if (filters.category) params.append('category', filters.category)
+    if (filters.last_updated) params.append('last_updated', filters.last_updated)
     if (filters.market) params.append('market', filters.market)
     if (filters.impact) params.append('impact', filters.impact)
     if (filters.keyword) params.append('keyword', filters.keyword)
     
     const url = `${API_BASE_URL}/insight${params.toString() ? '?' + params.toString() : ''}`
+    
+    console.log('🔍 Searching news with URL:', url)
     
     const response = await fetch(url, {
       method: 'GET',
@@ -843,7 +936,7 @@ const fetchNews = async (forceRefresh = false) => {
     if (data.code === '200') {
       allNews.value = data.data || []
       saveNewsToCache(allNews.value)
-      notification.success(`Loaded ${allNews.value.length} news articles`)
+      notification.success(`Found ${allNews.value.length} news articles`)
     } else {
       throw new Error(data.message || 'Failed to fetch news')
     }
@@ -851,7 +944,7 @@ const fetchNews = async (forceRefresh = false) => {
     error.value = err.message
     notification.error(err.message)
   } finally {
-    loading.value = false
+    newsLoading.value = false
   }
 }
 
@@ -896,1007 +989,11 @@ const fetchEvents = async (forceRefresh = false) => {
   }
 }
 
-// Watch for filter changes
-watch([() => filters.category, () => filters.market, () => filters.impact, () => filters.country, () => filters.source], () => {
+// Watch for filter changes (only for UI updates, not API calls)
+watch([() => filters.market, () => filters.impact, () => filters.country, () => filters.source], () => {
   applyFilters()
 })
 </script>
 <style scoped>
-.insight-page {
-  padding: clamp(12px, 2.25vw, 18px);
-  max-width: 1600px;
-  margin: 0 auto;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.page-header {
-  margin-bottom: 18px;
-}
-
-.page-header h1 {
-  margin: 0 0 6px 0;
-  color: var(--text-main);
-  font-size: clamp(18px, 3vw, 24px);
-}
-
-.page-header .subtitle {
-  margin: 0;
-  color: #6b7280;
-  font-size: 10.5px;
-}
-
-.dark .page-header .subtitle {
-  color: #9ca3af;
-}
-
-.content-wrapper {
-  display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 18px;
-}
-
-@media (max-width: 1024px) {
-  .content-wrapper {
-    grid-template-columns: 220px 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .content-wrapper {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Filters Sidebar */
-.filters-sidebar {
-  background: white;
-  border-radius: 6px;
-  padding: 15px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  height: fit-content;
-  position: sticky;
-  top: 18px;
-}
-
-.dark .filters-sidebar {
-  background: #1f2937;
-}
-
-.filters-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.filters-header h3 {
-  margin: 0;
-  font-size: 13.5px;
-  color: #1f2937;
-}
-
-.dark .filters-header h3 {
-  color: white;
-}
-
-.reset-filters-btn {
-  padding: 3px 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 3px;
-  background: white;
-  color: #6b7280;
-  font-size: 9px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.reset-filters-btn:hover {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.dark .reset-filters-btn {
-  background: #374151;
-  border-color: #4b5563;
-  color: #9ca3af;
-}
-
-.dark .reset-filters-btn:hover {
-  background: #4b5563;
-  color: white;
-}
-
-.filter-group {
-  margin-bottom: 15px;
-}
-
-.filter-label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 10.5px;
-  font-weight: 500;
-  color: #374151;
-}
-
-.dark .filter-label {
-  color: #e5e7eb;
-}
-
-.filter-select {
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  font-size: 10.5px;
-  background: white;
-  color: #1f2937;
-  cursor: pointer;
-}
-
-.dark .filter-select {
-  background: #374151;
-  border-color: #4b5563;
-  color: white;
-}
-
-.impact-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.impact-option {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  cursor: pointer;
-  font-size: 10.5px;
-}
-
-.impact-option input[type="radio"] {
-  margin: 0;
-  cursor: pointer;
-}
-
-.impact-high {
-  color: #ef4444;
-  font-weight: 500;
-}
-
-.impact-medium {
-  color: #f59e0b;
-  font-weight: 500;
-}
-
-.impact-low {
-  color: #10b981;
-  font-weight: 500;
-}
-
-.impact-holiday {
-  color: #8b5cf6;
-  font-weight: 500;
-}
-
-.keyword-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.keyword-input {
-  width: 100%;
-  padding: 6px 25px 6px 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  font-size: 10.5px;
-  background: white;
-  color: #1f2937;
-}
-
-.dark .keyword-input {
-  background: #374151;
-  border-color: #4b5563;
-  color: white;
-}
-
-.clear-btn {
-  position: absolute;
-  right: 6px;
-  background: none;
-  border: none;
-  color: #9ca3af;
-  cursor: pointer;
-  padding: 2px;
-  font-size: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.clear-btn:hover {
-  color: #ef4444;
-}
-
-.active-filters {
-  margin-top: 15px;
-  padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.dark .active-filters {
-  border-top-color: #374151;
-}
-
-.active-filters-title {
-  font-size: 9px;
-  color: #6b7280;
-  margin-bottom: 6px;
-}
-
-.filter-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.filter-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 6px;
-  background: #f3f4f6;
-  border-radius: 3px;
-  font-size: 8px;
-  color: #374151;
-}
-
-.dark .filter-tag {
-  background: #374151;
-  color: #e5e7eb;
-}
-
-.filter-tag button {
-  background: none;
-  border: none;
-  color: #6b7280;
-  cursor: pointer;
-  padding: 0;
-  font-size: 8px;
-  display: flex;
-  align-items: center;
-}
-
-.filter-tag button:hover {
-  color: #ef4444;
-}
-
-/* Main Content */
-.main-content {
-  background: white;
-  border-radius: 6px;
-  padding: 15px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.dark .main-content {
-  background: #1f2937;
-}
-
-.stats-bar {
-  display: flex;
-  gap: 20px;
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid #e5e7eb;
-  flex-wrap: wrap;
-}
-
-.dark .stats-bar {
-  border-bottom-color: #374151;
-}
-
-.stat-item {
-  display: flex;
-  flex-direction: column;
-}
-
-.stat-label {
-  font-size: 8px;
-  color: #6b7280;
-  margin-bottom: 2px;
-}
-
-.stat-value {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.dark .stat-value {
-  color: white;
-}
-
-/* Tab Navigation */
-.tab-navigation {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 15px;
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 8px;
-}
-
-.dark .tab-navigation {
-  border-bottom-color: #374151;
-}
-
-.tab-btn {
-  padding: 6px 12px;
-  border: none;
-  background: none;
-  color: #6b7280;
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.tab-btn:hover {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.tab-btn.active {
-  background: #3b82f6;
-  color: white;
-}
-
-.dark .tab-btn:hover {
-  background: #374151;
-  color: #e5e7eb;
-}
-
-/* News Feed */
-.news-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.news-card {
-  padding: 12px;
-  background: #f9fafb;
-  border-radius: 6px;
-  border-left: 3px solid transparent;
-  transition: all 0.2s;
-}
-
-.news-card:hover {
-  transform: translateX(-2px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.news-card.high {
-  border-left-color: #ef4444;
-}
-
-.news-card.medium {
-  border-left-color: #f59e0b;
-}
-
-.news-card.low {
-  border-left-color: #10b981;
-}
-
-.dark .news-card {
-  background: #374151;
-}
-
-.news-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.news-meta {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.news-source {
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 8px;
-  font-weight: 500;
-  background: #e5e7eb;
-  color: #374151;
-}
-
-.news-source.bbc {
-  background: #b91c1c;
-  color: white;
-}
-
-.news-source.aljazeera {
-  background: #0f4e3a;
-  color: white;
-}
-
-.news-source.theguardian {
-  background: #052962;
-  color: white;
-}
-
-.news-category {
-  padding: 2px 6px;
-  background: #e5e7eb;
-  border-radius: 3px;
-  font-size: 8px;
-  color: #374151;
-}
-
-.news-impact {
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 8px;
-  font-weight: 500;
-}
-
-.news-impact.high {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.news-impact.medium {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.news-impact.low {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.dark .news-impact.high {
-  background: #7f1d1d;
-  color: #fecaca;
-}
-
-.dark .news-impact.medium {
-  background: #78350f;
-  color: #fcd34d;
-}
-
-.dark .news-impact.low {
-  background: #064e3b;
-  color: #a7f3d0;
-}
-
-.news-time {
-  font-size: 8px;
-  color: #6b7280;
-  white-space: nowrap;
-}
-
-.news-title {
-  margin: 0 0 6px 0;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.news-title a {
-  color: #1f2937;
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-.news-title a:hover {
-  color: #3b82f6;
-}
-
-.dark .news-title a {
-  color: white;
-}
-
-.dark .news-title a:hover {
-  color: #60a5fa;
-}
-
-.news-description {
-  margin: 0 0 8px 0;
-  font-size: 9.75px;
-  line-height: 1.5;
-  color: #4b5563;
-}
-
-.dark .news-description {
-  color: #9ca3af;
-}
-
-.news-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.market-tags {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.market-tag {
-  padding: 2px 6px;
-  background: #e0f2fe;
-  border-radius: 3px;
-  font-size: 7.5px;
-  color: #0369a1;
-}
-
-.dark .market-tag {
-  background: #0c4a6e;
-  color: #7dd3fc;
-}
-
-.no-tags {
-  font-size: 7.5px;
-  color: #9ca3af;
-  font-style: italic;
-}
-
-.read-more {
-  font-size: 8px;
-  color: #3b82f6;
-  text-decoration: none;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.read-more:hover {
-  text-decoration: underline;
-}
-
-/* Events Feed */
-.events-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.event-date-group {
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.dark .event-date-group {
-  border-color: #374151;
-}
-
-.event-date-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: #f3f4f6;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.dark .event-date-header {
-  background: #2d3748;
-  border-bottom-color: #4a5568;
-}
-
-.event-date-header h4 {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.dark .event-date-header h4 {
-  color: white;
-}
-
-.event-count {
-  font-size: 8px;
-  color: #6b7280;
-  background: white;
-  padding: 2px 6px;
-  border-radius: 10px;
-}
-
-.dark .event-count {
-  background: #4a5568;
-  color: #e5e7eb;
-}
-
-.event-card {
-  display: flex;
-  padding: 12px;
-  border-bottom: 1px solid #e5e7eb;
-  transition: background 0.2s;
-}
-
-.event-card:last-child {
-  border-bottom: none;
-}
-
-.event-card:hover {
-  background: #f9fafb;
-}
-
-.event-card.high {
-  border-left: 3px solid #ef4444;
-}
-
-.event-card.medium {
-  border-left: 3px solid #f59e0b;
-}
-
-.event-card.low {
-  border-left: 3px solid #10b981;
-}
-
-.event-card.holiday {
-  border-left: 3px solid #8b5cf6;
-}
-
-.dark .event-card {
-  border-bottom-color: #374151;
-}
-
-.dark .event-card:hover {
-  background: #2d3748;
-}
-
-.event-time {
-  width: 100px;
-  font-size: 10px;
-  font-weight: 500;
-  color: #6b7280;
-  padding-top: 2px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.event-countdown {
-  font-size: 8px;
-  font-weight: 600;
-  color: #3b82f6;
-  background: #dbeafe;
-  padding: 2px 4px;
-  border-radius: 3px;
-  display: inline-block;
-  width: fit-content;
-}
-
-.dark .event-countdown {
-  background: #1e3a8a;
-  color: #93c5fd;
-}
-
-.event-content {
-  flex: 1;
-}
-
-.event-header {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 4px;
-  flex-wrap: wrap;
-}
-
-.event-country {
-  padding: 2px 8px;
-  background: #e5e7eb;
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 600;
-  color: #374151;
-}
-
-.dark .event-country {
-  background: #4a5568;
-  color: #e5e7eb;
-}
-
-.event-impact {
-  padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 8px;
-  font-weight: 500;
-}
-
-.event-impact.high {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.event-impact.medium {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.event-impact.low {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.event-impact.holiday {
-  background: #ede9fe;
-  color: #6d28d9;
-}
-
-.dark .event-impact.high {
-  background: #7f1d1d;
-  color: #fecaca;
-}
-
-.dark .event-impact.medium {
-  background: #78350f;
-  color: #fcd34d;
-}
-
-.dark .event-impact.low {
-  background: #064e3b;
-  color: #a7f3d0;
-}
-
-.dark .event-impact.holiday {
-  background: #4c1d95;
-  color: #ddd6fe;
-}
-
-.event-title {
-  margin: 0 0 8px 0;
-  font-size: 11px;
-  font-weight: 500;
-  color: #1f2937;
-}
-
-.dark .event-title {
-  color: white;
-}
-
-.event-details {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 4px;
-}
-
-.event-detail {
-  display: flex;
-  flex-direction: column;
-}
-
-.detail-label {
-  font-size: 7px;
-  color: #6b7280;
-  margin-bottom: 2px;
-}
-
-.detail-value {
-  font-size: 9px;
-  font-weight: 500;
-  color: #374151;
-}
-
-.dark .detail-value {
-  color: #e5e7eb;
-}
-
-/* Pagination */
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  margin-top: 15px;
-  padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.dark .pagination {
-  border-top-color: #374151;
-}
-
-.pagination-btn {
-  padding: 4px 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  background: white;
-  color: #374151;
-  cursor: pointer;
-  font-size: 9px;
-  transition: all 0.2s;
-}
-
-.pagination-btn:hover:not(:disabled) {
-  background: #f3f4f6;
-}
-
-.pagination-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.dark .pagination-btn {
-  background: #374151;
-  border-color: #4b5563;
-  color: white;
-}
-
-.dark .pagination-btn:hover:not(:disabled) {
-  background: #4b5563;
-}
-
-.page-info {
-  font-size: 9px;
-  color: #6b7280;
-}
-
-/* Loading state */
-.loading-state {
-  text-align: center;
-  padding: 30px;
-  color: #6b7280;
-}
-
-.spinner {
-  width: 30px;
-  height: 30px;
-  margin: 0 auto 12px;
-  border: 2px solid #f3f4f6;
-  border-top-color: #3b82f6;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Error state */
-.error-state {
-  text-align: center;
-  padding: 30px;
-}
-
-.error-message {
-  color: #ef4444;
-  margin-bottom: 10px;
-  font-size: 11px;
-}
-
-.btn-retry {
-  padding: 5px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  background: white;
-  color: #374151;
-  cursor: pointer;
-  font-size: 9px;
-}
-
-.dark .btn-retry {
-  background: #374151;
-  border-color: #4b5563;
-  color: white;
-}
-
-.no-data {
-  text-align: center;
-  padding: 40px;
-  color: #6b7280;
-  font-size: 11px;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-  .filters-sidebar {
-    position: static;
-    margin-bottom: 12px;
-  }
-  
-  .news-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .news-meta {
-    width: 100%;
-  }
-  
-  .news-time {
-    align-self: flex-end;
-  }
-  
-  .event-card {
-    flex-direction: column;
-  }
-  
-  .event-time {
-    width: auto;
-    margin-bottom: 4px;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  .event-details {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-}
-
-@media (max-width: 480px) {
-  .stats-bar {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  
-  .stat-item {
-    min-width: calc(50% - 6px);
-  }
-  
-  .news-footer {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  
-  .read-more {
-    align-self: flex-end;
-  }
-  
-  .pagination {
-    flex-wrap: wrap;
-  }
-  
-  .tab-navigation {
-    flex-direction: column;
-  }
-  
-  .tab-btn {
-    width: 100%;
-    text-align: center;
-  }
-  
-  .event-time {
-    flex-wrap: wrap;
-  }
-}
-
-/* Touch improvements */
-@media (hover: none) and (pointer: coarse) {
-  .filter-select,
-  .keyword-input,
-  .pagination-btn,
-  .btn-retry,
-  .tab-btn {
-    padding: 8px 12px;
-    font-size: 12px;
-  }
-  
-  .filter-tag {
-    padding: 5px 8px;
-  }
-  
-  .filter-tag button {
-    padding: 2px 6px;
-  }
-  
-  .event-card {
-    padding: 15px;
-  }
-}
+  @import '../assets/styles/insight.css';
 </style>
