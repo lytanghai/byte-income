@@ -27,7 +27,7 @@
           <div class="card-content">
             <span class="card-label">Net P&L</span>
             <span class="card-value" :class="getPnLClass(summaryData.netPnL)">
-              ${{ summaryData.netPnL.toFixed(2)}}
+              ¢{{ summaryData.netPnL.toFixed(2) / 100}} ≃ {{formatCurrency(summaryData.netPnL)}} 
             </span>
           </div>
         </div>
@@ -84,7 +84,7 @@
           <div class="stat-body">
             <div class="stat-row">
               <span class="stat-name">Profit Days</span>
-              <span class="stat-value profit">{{ summaryData.performance?.profitDays || 0 }}</span>
+              <span class="stat-value profit">{{ summaryData.performance?.profitDays / 100 || 0 }}</span>
             </div>
             <div class="stat-row">
               <span class="stat-name">Loss Days</span>
@@ -92,11 +92,11 @@
             </div>
             <div class="stat-row">
               <span class="stat-name">Best Day</span>
-              <span class="stat-value profit">{{ formatCurrency(summaryData.performance?.bestDay) }}</span>
+              <span class="stat-value profit">¢{{ (summaryData.performance?.bestDay) }} ≃ {{formatCurrency(summaryData.performance?.bestDay)}}</span>
             </div>
             <div class="stat-row">
               <span class="stat-name">Worst Day</span>
-              <span class="stat-value loss">{{ formatCurrency(summaryData.performance?.worstDay) }}</span>
+              <span class="stat-value loss">¢{{ summaryData.performance?.worstDay }} ≃ {{formatCurrency(summaryData.performance?.worstDay)}} </span>
             </div>
           </div>
         </div>
@@ -110,19 +110,19 @@
           <div class="stat-body">
             <div class="stat-row">
               <span class="stat-name">Total Profit</span>
-              <span class="stat-value profit">{{ formatCurrency(summaryData.transactions?.totalProfit) }}</span>
+              <span class="stat-value profit">¢{{ summaryData.transactions?.totalProfit }} ≃ {{ formatCurrency(summaryData.transactions?.totalProfit) }}</span>
             </div>
             <div class="stat-row">
               <span class="stat-name">Total Loss</span>
-              <span class="stat-value loss">{{ formatCurrency(summaryData.transactions?.totalLoss) }}</span>
+              <span class="stat-value loss">¢{{ summaryData.transactions?.totalLoss }} ≃ {{ formatCurrency(summaryData.transactions?.totalLoss) }}</span>
             </div>
             <div class="stat-row">
               <span class="stat-name">Deposits</span>
-              <span class="stat-value">{{ formatCurrency(summaryData.transactions?.totalDeposit) }}</span>
+              <span class="stat-value">{{ formatCurrency(summaryData.transactions?.totalDeposit / 100).toFixed(2) }}</span>
             </div>
             <div class="stat-row">
               <span class="stat-name">Withdrawals</span>
-              <span class="stat-value">{{ formatCurrency(summaryData.transactions?.totalWithdrawal) }}</span>
+              <span class="stat-value">{{ formatCurrency(summaryData.transactions?.totalWithdrawal / 100).toFixed(2) }}</span>
             </div>
           </div>
         </div>
@@ -201,7 +201,7 @@
                   <span class="tx-type" :class="tx.type.toLowerCase()">{{ tx.type }}</span>
                 </div>
                 <span class="tx-amount" :class="tx.type.toLowerCase()">
-                  {{ formatCurrency(tx.pnl) }}
+                  ¢{{ (tx.pnl / 100).toFixed(2) }}
                 </span>
               </div>
             </div>
