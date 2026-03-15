@@ -27,7 +27,7 @@
           <div class="card-content">
             <span class="card-label">Net P&L</span>
             <span class="card-value" :class="getPnLClass(summaryData.netPnL)">
-              {{ formatCurrency(summaryData.netPnL) }}
+              ${{ summaryData.netPnL.toFixed(2)}}
             </span>
           </div>
         </div>
@@ -43,7 +43,7 @@
         <div class="summary-card">
           <div class="card-icon">🔄</div>
           <div class="card-content">
-            <span class="card-label">Total Trades</span>
+            <span class="card-label">Total Transactions</span>
             <span class="card-value">{{ summaryData.totalTrades }}</span>
           </div>
         </div>

@@ -1,29 +1,50 @@
 <template>
   <div class="login-container">
-    <!-- Background Pattern -->
-    <div class="background-pattern">
-      <div class="pattern-circle circle-1"></div>
-      <div class="pattern-circle circle-2"></div>
-      <div class="pattern-circle circle-3"></div>
+    <!-- Full-screen GIF Background -->
+    <div class="background-gif">
+      <img src="../assets/raining.gif" class="gif-background" />
+      <div class="overlay"></div>
     </div>
 
-    <div class="login-card">
+    <!-- AI Terminal Overlay (shown during authentication) -->
+    <transition name="fade">
+      <div v-if="showTerminal" class="terminal-overlay">
+        <div class="terminal-window">
+          <div class="terminal-header">
+            <span class="terminal-title">BYTE INCOME SECURE TERMINAL v2.0</span>
+            <div class="terminal-controls">
+              <span class="terminal-dot red"></span>
+              <span class="terminal-dot yellow"></span>
+              <span class="terminal-dot green"></span>
+            </div>
+          </div>
+          
+          <div class="terminal-body">
+            <div v-for="(line, index) in terminalLines" :key="index" class="terminal-line">
+              <span class="terminal-prompt">{{ line.prompt }}</span>
+              <span class="terminal-text">{{ line.text }}</span>
+              <span v-if="line.blink" class="terminal-cursor">_</span>
+            </div>
+            
+            <div class="terminal-progress" v-if="showProgress">
+              <div class="progress-bar">
+                <div class="progress-fill" :style="{ width: progressWidth + '%' }"></div>
+              </div>
+              <span class="progress-text">{{ progressWidth }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <div class="login-card" :class="{ 'blurred': showTerminal }">
       <!-- Logo Section -->
       <div class="logo-section">
         <div class="logo-wrapper">
-          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M6 15C6 16.6569 4.65685 18 3 18C1.34315 18 0 16.6569 0 15C0 13.3431 1.34315 12 3 12H6V15Z" fill="currentColor"/>
-            <path d="M8 15C8 13.3431 9.34315 12 11 12C12.6569 12 14 13.3431 14 15V21C14 22.6569 12.6569 24 11 24C9.34315 24 8 22.6569 8 21V15Z" fill="currentColor"/>
-            <path d="M11 6C9.34315 6 8 4.65685 8 3C8 1.34315 9.34315 0 11 0C12.6569 0 14 1.34315 14 3V6H11Z" fill="currentColor"/>
-            <path d="M11 8C12.6569 8 14 9.34315 14 11C14 12.6569 12.6569 14 11 14H5C3.34315 14 2 12.6569 2 11C2 9.34315 3.34315 8 5 8H11Z" fill="currentColor"/>
-            <path d="M18 9C18 7.34315 19.3431 6 21 6C22.6569 6 24 7.34315 24 9C24 10.6569 22.6569 12 21 12H18V9Z" fill="currentColor"/>
-            <path d="M16 9C16 10.6569 14.6569 12 13 12C11.3431 12 10 10.6569 10 9V3C10 1.34315 11.3431 0 13 0C14.6569 0 16 1.34315 16 3V9Z" fill="currentColor"/>
-            <path d="M13 18C14.6569 18 16 19.3431 16 21C16 22.6569 14.6569 24 13 24C11.3431 24 10 22.6569 10 21V18H13Z" fill="currentColor"/>
-            <path d="M13 16C11.3431 16 10 14.6569 10 13C10 11.3431 11.3431 10 13 10H19C20.6569 10 22 11.3431 22 13C22 14.6569 20.6569 16 19 16H13Z" fill="currentColor"/>
-          </svg>
+          <img src="../assets/trading.gif" width="60" alt="Logo" class="logo-gif" />
         </div>
-        <h1 class="login-title">Sign in to Portal Management</h1>
-        <p class="login-subtitle">Enter your credentials to access your account</p>
+        <h1 class="login-title">Byte Income</h1>
+        <p class="login-subtitle">Trading Data Management System</p>
       </div>
 
       <!-- Form Section -->
@@ -42,7 +63,8 @@
               @blur="validateField('username')"
               class="form-input"
               :class="{ error: errors.username }"
-              placeholder="e.g., johndoe"
+              placeholder="Enter Your Username"
+              :disabled="showTerminal"
             />
           </div>
           <transition name="fade">
@@ -70,12 +92,14 @@
               class="form-input"
               :class="{ error: errors.password }"
               placeholder="Enter your password"
+              :disabled="showTerminal"
             />
             <button 
               type="button" 
               class="password-toggle" 
               @click="showPassword = !showPassword"
               :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              :disabled="showTerminal"
             >
               <svg v-if="!showPassword" class="toggle-icon" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
@@ -100,18 +124,17 @@
         <!-- Options -->
         <div class="form-options">
           <label class="checkbox-wrapper">
-            <input type="checkbox" v-model="formData.rememberMe" class="checkbox-input" />
+            <input type="checkbox" v-model="formData.rememberMe" class="checkbox-input" :disabled="showTerminal" />
             <span class="checkbox-custom"></span>
             <span class="checkbox-label">Keep me signed in</span>
           </label>
-          <!-- <a href="#" class="forgot-link">Forgot password?</a> -->
         </div>
 
         <!-- Submit Button -->
         <button
           type="submit"
           class="submit-button"
-          :disabled="isLoading || !isFormValid"
+          :disabled="isLoading || !isFormValid || showTerminal"
         >
           <span v-if="isLoading" class="spinner"></span>
           <span v-else>Sign In</span>
@@ -133,18 +156,8 @@
 
       <!-- Footer -->
       <div class="login-footer">
-        <!-- <div class="divider">
-          <span class="divider-text">New to our platform?</span>
-        </div>
-        <button class="signup-button">
-          Create an account
-          <svg class="signup-arrow" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd" />
-          </svg>
-        </button> -->
         <p class="help-text">
-          <!-- Need help? <a href="#" class="help-link">Contact admin for your onboarding</a> -->
-           Contact admin for your onboarding
+          Contact admin for your onboarding
         </p>
       </div>
     </div>
@@ -163,6 +176,10 @@ const isRedirecting = ref(false)
 const loginError = ref('')
 const showPassword = ref(false)
 const isLoading = ref(false)
+const showTerminal = ref(false)
+const showProgress = ref(false)
+const progressWidth = ref(0)
+const terminalLines = ref([])
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
@@ -232,6 +249,61 @@ const loginUser = async (credentials) => {
   }
 }
 
+// AI Terminal Animation
+const addTerminalLine = (prompt, text, blink = false) => {
+  terminalLines.value.push({ prompt, text, blink })
+}
+
+const clearTerminal = () => {
+  terminalLines.value = []
+}
+
+const startAISequence = async () => {
+  showTerminal.value = true
+  clearTerminal()
+  
+  // Initializing sequence
+  addTerminalLine('>', 'INITIALIZING SECURE CONNECTION...')
+  await new Promise(resolve => setTimeout(resolve, 800))
+  
+  addTerminalLine('>', 'ESTABLISHING ENCRYPTED TUNNEL...')
+  await new Promise(resolve => setTimeout(resolve, 600))
+  
+  addTerminalLine('>', 'VERIFYING CREDENTIALS...')
+  await new Promise(resolve => setTimeout(resolve, 500))
+  
+  addTerminalLine('>', `AUTHENTICATING USER: ${formData.username.toUpperCase()}`, true)
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  
+  // Show progress bar
+  showProgress.value = true
+  
+  // Progress animation
+  for (let i = 0; i <= 100; i += 5) {
+    progressWidth.value = i
+    await new Promise(resolve => setTimeout(resolve, 50))
+  }
+  
+  addTerminalLine('✓', 'BIOMETRIC SCAN COMPLETE')
+  await new Promise(resolve => setTimeout(resolve, 400))
+  
+  addTerminalLine('✓', 'TOKEN GENERATED: 0x' + Math.random().toString(36).substring(2, 15).toUpperCase())
+  await new Promise(resolve => setTimeout(resolve, 400))
+  
+  addTerminalLine('✓', 'SESSION ESTABLISHED')
+  await new Promise(resolve => setTimeout(resolve, 400))
+  
+  addTerminalLine('✓', 'ACCESS GRANTED - WELCOME TO BYTE INCOME')
+  await new Promise(resolve => setTimeout(resolve, 800))
+  
+  // Hide terminal and redirect
+  showTerminal.value = false
+  showProgress.value = false
+  
+  isRedirecting.value = true
+  setTimeout(() => router.push('/overview'), 1000)
+}
+
 const handleSubmit = async () => {
   if (!validateForm()) return
   isLoading.value = true
@@ -239,22 +311,36 @@ const handleSubmit = async () => {
 
   try {
     const data = await loginUser({ username: formData.username, password: formData.password })
+    
+    // Store credentials
     localStorage.setItem('authToken', data.token)
     localStorage.setItem('isAuthenticated', 'true')
     localStorage.setItem('userData', JSON.stringify({ username: data.username }))
     if (formData.rememberMe) localStorage.setItem('rememberMe', 'true')
     else localStorage.removeItem('rememberMe')
-
-    isRedirecting.value = true
-    setTimeout(() => router.push('/overview'), 1000)
+    
+    // Start AI terminal sequence
+    isLoading.value = false
+    await startAISequence()
+    
   } catch (err) {
     loginError.value = err.message || 'Login failed. Please try again.'
     isLoading.value = false
+    
+    // Show error in terminal
+    showTerminal.value = true
+    clearTerminal()
+    addTerminalLine('!', 'AUTHENTICATION FAILED')
+    addTerminalLine('>', `ERROR: ${err.message || 'Invalid credentials'}`)
+    addTerminalLine('>', 'PLEASE TRY AGAIN')
+    
+    setTimeout(() => {
+      showTerminal.value = false
+    }, 3000)
   }
 }
 </script>
 
 <style scoped>
-/* Reset any potential scrolling */
   @import '../assets/styles/login.css';
 </style>
