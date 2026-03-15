@@ -3,7 +3,7 @@
         <!-- Sidebar -->
         <aside class="sidebar" :class="{ open: isSidebarOpen }">
             <div class="sidebar-header">
-                <h2 class="logo">Byte Income</h2>
+                <h2 class="logo">DataBae</h2>
                 <button class="close-sidebar mobile-only" @click="closeSidebar">✕</button>
             </div>
 
