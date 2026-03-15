@@ -167,7 +167,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import LoadingOverlay from '../components/LoadingOverlay.vue'
 
@@ -182,21 +182,6 @@ const progressWidth = ref(0)
 const terminalLines = ref([])
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
-
-// Viewport height management
-const setVH = () => {
-  const vh = window.innerHeight * 0.01
-  document.documentElement.style.setProperty('--vh', `${vh}px`)
-}
-
-onMounted(() => {
-  setVH()
-  window.addEventListener('resize', setVH)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', setVH)
-})
 
 const formData = reactive({
   username: '',
@@ -293,7 +278,7 @@ const startAISequence = async () => {
   addTerminalLine('✓', 'SESSION ESTABLISHED')
   await new Promise(resolve => setTimeout(resolve, 400))
   
-  addTerminalLine('✓', 'ACCESS GRANTED - WELCOME TO BYTE INCOME')
+  addTerminalLine('✓', 'ACCESS GRANTED - WELCOME TO DATABASE')
   await new Promise(resolve => setTimeout(resolve, 800))
   
   // Hide terminal and redirect
@@ -312,7 +297,7 @@ const handleSubmit = async () => {
   try {
     const data = await loginUser({ username: formData.username, password: formData.password })
     
-    // Store credentials
+    // Store auth data
     localStorage.setItem('authToken', data.token)
     localStorage.setItem('isAuthenticated', 'true')
     localStorage.setItem('userData', JSON.stringify({ username: data.username }))

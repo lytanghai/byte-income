@@ -91,7 +91,7 @@
         <div class="card-icon profit">📊</div>
         <div class="card-content">
           <span class="card-label">Total Profit</span>
-          <span class="card-value profit">{{ formatCurrency(summary.totalProfit) }}</span>
+          <span class="card-value profit">¢{{ summary.totalProfit.toFixed(2) }}</span>
         </div>
       </div>
       
@@ -99,7 +99,7 @@
         <div class="card-icon loss">📉</div>
         <div class="card-content">
           <span class="card-label">Total Loss</span>
-          <span class="card-value loss">{{ formatCurrency(summary.totalLoss) }}</span>
+          <span class="card-value loss">¢{{ summary.totalLoss.toFixed(2) }}</span>
         </div>
       </div>
       
@@ -108,7 +108,7 @@
         <div class="card-content">
           <span class="card-label">Net P&L</span>
           <span class="card-value" :class="getProfitClass(summary.netPnL)">
-            {{ formatCurrency(summary.netPnL) }}
+            ¢{{ summary.netPnL.toFixed(2) }}
           </span>
         </div>
       </div>
