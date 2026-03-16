@@ -235,6 +235,7 @@
               class="form-select"
             >
               <option value="">-- Select Symbol --</option>
+              <option value="USD">USD</option>
               <option value="XAU">XAU (Gold)</option>
               <option value="XAG">XAG (Silver)</option>
               <option value="AUD">AUD</option>
