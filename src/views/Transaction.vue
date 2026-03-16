@@ -125,7 +125,6 @@
         <table class="transactions-table">
           <thead>
             <tr>
-              <th>SN</th>
               <th>Symbol</th>
               <th>Type</th>
               <th>Lot Size</th>
@@ -137,7 +136,6 @@
           </thead>
           <tbody>
             <tr v-for="transaction in paginatedTransactions" :key="transaction.sn">
-              <td class="sn-cell">#{{ transaction.sn }}</td>
               <td>
                 <span class="symbol-badge">{{ transaction.symbol || '-' }}</span>
               </td>
@@ -680,7 +678,7 @@ const resetFilters = () => {
 
 // ============== COMPUTED ==============
 const filteredTransactions = computed(() => {
-  return transactions.value.filter(t => {
+  let data = transactions.value.filter(t => {
     if (filters.symbol && !t.symbol?.toLowerCase().includes(filters.symbol.toLowerCase())) return false
     if (filters.type && t.type !== filters.type) return false
     if (filters.currency && t.currency !== filters.currency) return false
@@ -690,6 +688,10 @@ const filteredTransactions = computed(() => {
     }
     return true
   })
+
+  data.sort((a, b) => new Date(b.date) - new Date(a.date))
+
+  return data
 })
 
 const paginatedTransactions = computed(() => {
