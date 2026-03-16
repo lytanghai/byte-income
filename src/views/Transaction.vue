@@ -127,7 +127,6 @@
             <tr>
               <th>Symbol</th>
               <th>Type</th>
-              <th>Lot Size</th>
               <th>Amount</th>
               <th>Currency</th>
               <th>Date</th>
@@ -144,7 +143,6 @@
                   {{ transaction.type }}
                 </span>
               </td>
-              <td>{{ transaction.lot_size ? transaction.lot_size.toFixed(2) : '-' }}</td>
               <td :class="getAmountClass(transaction)">
                 {{ formatTransactionAmount(transaction) }}
               </td>
