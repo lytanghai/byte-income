@@ -11,7 +11,7 @@
       <button class="btn btn-primary" @click="openCreateModal">
         <span class="btn-icon">+</span> Add New Transaction
       </button>
-      
+
       <div class="action-group">
         <!-- Cache Status -->
         <span v-if="cacheStatus" class="cache-status" :class="cacheStatus.type">
@@ -21,20 +21,15 @@
             ({{ formatTimeAgo(lastUpdated) }})
           </span>
         </span>
-        
+
         <!-- Last Updated Info -->
         <span v-if="lastUpdated" class="last-updated">
           Last updated: {{ formatTimeAgo(lastUpdated) }}
         </span>
-        
+
         <!-- Refresh Button -->
-        <button 
-          class="btn btn-refresh" 
-          @click="handleRefresh" 
-          :disabled="refreshing"
-          :class="{ 'refreshing': refreshing }"
-          title="Refresh data"
-        >
+        <button class="btn btn-refresh" @click="handleRefresh" :disabled="refreshing"
+          :class="{ 'refreshing': refreshing }" title="Refresh data">
           <span class="refresh-icon" :class="{ 'spin': refreshing }">↻</span>
           {{ refreshing ? 'Refreshing...' : 'Refresh' }}
         </button>
@@ -44,15 +39,10 @@
     <!-- Search and Filter Bar -->
     <div class="filter-bar">
       <div class="filter-group">
-        <input 
-          type="text" 
-          v-model="filters.symbol" 
-          placeholder="Symbol (XAU, XAG...)"
-          class="filter-input"
-          @input="debouncedApplyFilters"
-        />
+        <input type="text" v-model="filters.symbol" placeholder="Symbol (XAU, XAG...)" class="filter-input"
+          @input="debouncedApplyFilters" />
       </div>
-      
+
       <div class="filter-group">
         <select v-model="filters.type" @change="applyFilters" class="filter-select">
           <option value="">All Types</option>
@@ -62,7 +52,7 @@
           <option value="WITHDRAWAL">Withdrawal</option>
         </select>
       </div>
-      
+
       <div class="filter-group">
         <select v-model="filters.currency" @change="applyFilters" class="filter-select">
           <option value="">All Currencies</option>
@@ -70,16 +60,11 @@
           <option value="USDC">USDC</option>
         </select>
       </div>
-      
+
       <div class="filter-group">
-        <input 
-          type="date" 
-          v-model="filters.date" 
-          class="filter-input"
-          @change="applyFilters"
-        />
+        <input type="date" v-model="filters.date" class="filter-input" @change="applyFilters" />
       </div>
-      
+
       <button @click="resetFilters" class="btn btn-secondary" :disabled="!hasActiveFilters">
         Clear Filters
       </button>
@@ -94,7 +79,7 @@
           <span class="card-value profit">¢{{ summary.totalProfit.toFixed(2) }}</span>
         </div>
       </div>
-      
+
       <div class="summary-card">
         <div class="card-icon loss">📉</div>
         <div class="card-content">
@@ -102,7 +87,7 @@
           <span class="card-value loss">¢{{ summary.totalLoss.toFixed(2) }}</span>
         </div>
       </div>
-      
+
       <div class="summary-card">
         <div class="card-icon">💰</div>
         <div class="card-content">
@@ -112,7 +97,7 @@
           </span>
         </div>
       </div>
-      
+
       <div class="summary-card">
         <div class="card-icon">📋</div>
         <div class="card-content">
@@ -182,21 +167,13 @@
 
       <!-- Pagination -->
       <div class="pagination">
-        <button 
-          @click="changePage(currentPage - 1)" 
-          :disabled="currentPage === 1"
-          class="pagination-btn"
-        >
+        <button @click="changePage(currentPage - 1)" :disabled="currentPage === 1" class="pagination-btn">
           ← Previous
         </button>
         <span class="page-info">
           Page {{ currentPage }} of {{ totalPages }}
         </span>
-        <button 
-          @click="changePage(currentPage + 1)" 
-          :disabled="currentPage === totalPages"
-          class="pagination-btn"
-        >
+        <button @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages" class="pagination-btn">
           Next →
         </button>
       </div>
@@ -218,7 +195,7 @@
           <h2>{{ modalMode === 'create' ? 'Create Transaction' : 'Edit Transaction' }}</h2>
           <button class="close-btn" @click="closeModal">✕</button>
         </div>
-        
+
         <form @submit.prevent="handleSubmit" class="modal-form">
           <div v-if="modalMode === 'edit'" class="form-group">
             <label>Transaction SN</label>
@@ -228,12 +205,7 @@
           <!-- Symbol Field (optional for DEPOSIT/WITHDRAWAL) -->
           <div class="form-group">
             <label for="symbol">Symbol {{ isTradingType ? '*' : '(Optional)' }}</label>
-            <select 
-              id="symbol"
-              v-model="form.symbol" 
-     
-              class="form-select"
-            >
+            <select id="symbol" v-model="form.symbol" class="form-select">
               <option value="">-- Select Symbol --</option>
               <option value="USD">USD</option>
               <option value="XAU">XAU (Gold)</option>
@@ -250,43 +222,19 @@
             <label>Transaction Type *</label>
             <div class="radio-group">
               <label class="radio-option">
-                <input 
-                  type="radio" 
-                  v-model="form.type" 
-                  value="PROFIT"
-                  required
-                  @change="handleTypeChange"
-                />
+                <input type="radio" v-model="form.type" value="PROFIT" required @change="handleTypeChange" />
                 <span class="radio-label profit">Profit</span>
               </label>
               <label class="radio-option">
-                <input 
-                  type="radio" 
-                  v-model="form.type" 
-                  value="LOSS"
-                  required
-                  @change="handleTypeChange"
-                />
+                <input type="radio" v-model="form.type" value="LOSS" required @change="handleTypeChange" />
                 <span class="radio-label loss">Loss</span>
               </label>
               <label class="radio-option">
-                <input 
-                  type="radio" 
-                  v-model="form.type" 
-                  value="DEPOSIT"
-                  required
-                  @change="handleTypeChange"
-                />
+                <input type="radio" v-model="form.type" value="DEPOSIT" required @change="handleTypeChange" />
                 <span class="radio-label deposit">Deposit</span>
               </label>
               <label class="radio-option">
-                <input 
-                  type="radio" 
-                  v-model="form.type" 
-                  value="WITHDRAWAL"
-                  required
-                  @change="handleTypeChange"
-                />
+                <input type="radio" v-model="form.type" value="WITHDRAWAL" required @change="handleTypeChange" />
                 <span class="radio-label withdrawal">Withdrawal</span>
               </label>
             </div>
@@ -295,38 +243,21 @@
           <!-- Lot Size Field (only for PROFIT/LOSS) -->
           <div v-if="isTradingType" class="form-group">
             <label for="lot_size">Lot Size</label>
-            <input 
-              type="number" 
-              id="lot_size"
-              v-model="form.lot_size" 
-              step="0.01"
-              min="0"
-              class="form-input"
-              placeholder="0.01"
-            />
+            <input type="number" id="lot_size" v-model="form.lot_size" step="0.01" min="0" class="form-input"
+              placeholder="0.01" />
           </div>
 
           <!-- Amount Field -->
           <div class="form-group">
             <label for="pnl">{{ amountLabel }} *</label>
-            <input 
-              type="number" 
-              id="pnl"
-              v-model="form.pnl" 
-              step="0.01"
-              class="form-input"
-              :placeholder="amountPlaceholder"
-            />
+            <input type="number" id="pnl" v-model="form.pnl" step="0.01" class="form-input"
+              :placeholder="amountPlaceholder" />
           </div>
 
           <!-- Currency Field -->
           <div class="form-group">
             <label for="currency">Currency *</label>
-            <select 
-              id="currency"
-              v-model="form.currency" 
-              class="form-select"
-            >
+            <select id="currency" v-model="form.currency" class="form-select">
               <option value="">Select Currency</option>
               <option value="USD">USD</option>
               <option value="USDC">USDC</option>
@@ -336,12 +267,7 @@
           <!-- Date Field (Optional) -->
           <div class="form-group">
             <label for="date">Transaction Date (Optional)</label>
-            <input 
-              type="date" 
-              id="date"
-              v-model="form.date" 
-              class="form-input"
-            />
+            <input type="date" id="date" v-model="form.date" class="form-input" />
             <small class="hint">Leave empty to use current date</small>
           </div>
 
@@ -365,11 +291,11 @@
           <h2>Confirm Delete</h2>
           <button class="close-btn" @click="closeDeleteModal">✕</button>
         </div>
-        
+
         <div class="delete-content">
           <div class="delete-icon">⚠️</div>
           <p class="delete-message">
-            Are you sure you want to delete transaction 
+            Are you sure you want to delete transaction
             <strong>#{{ selectedTransaction?.sn }} - {{ selectedTransaction?.symbol || 'N/A' }}</strong>?
           </p>
           <p class="warning">This action cannot be undone.</p>
@@ -417,7 +343,10 @@ const error = ref(null)
 const submitting = ref(false)
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
-const totalPages = ref(1)
+// const totalPages = ref(1)
+const totalPages = computed(() => {
+  return Math.ceil(filteredTransactions.value.length / itemsPerPage.value) || 1
+})
 const lastUpdated = ref(null)
 const cacheStatus = ref({ type: 'fresh', text: 'Loading...' })
 
@@ -453,7 +382,7 @@ const isTradingType = computed(() => {
 
 // Dynamic amount label based on type
 const amountLabel = computed(() => {
-  switch(form.type) {
+  switch (form.type) {
     case 'PROFIT':
       return 'Profit Amount'
     case 'LOSS':
@@ -468,7 +397,7 @@ const amountLabel = computed(() => {
 })
 
 const amountPlaceholder = computed(() => {
-  switch(form.type) {
+  switch (form.type) {
     case 'PROFIT':
       return '100.60'
     case 'LOSS':
@@ -505,7 +434,7 @@ const saveToCache = (data) => {
   try {
 
     saveCacheData(CACHE_KEY, JSON.stringify(data), 5)
-  
+
     const timestamp = new Date().toISOString()
     saveCacheData(CACHE_TIMESTAMP_KEY, timestamp, 5)
     lastUpdated.value = timestamp
@@ -520,22 +449,22 @@ const loadFromCache = () => {
   try {
     const cached = getCache(CACHE_KEY)
     const timestamp = getCache(CACHE_TIMESTAMP_KEY)
-    
+
     if (cached && timestamp) {
       const data = JSON.parse(cached)
       transactions.value = data
       lastUpdated.value = timestamp
-      
+
       const cacheTime = new Date(timestamp).getTime()
       const now = new Date().getTime()
       const ageInMinutes = Math.floor((now - cacheTime) / 60000)
-      
+
       if (ageInMinutes < 5) {
         cacheStatus.value = { type: 'cached', text: 'Cached data' }
       } else {
         cacheStatus.value = { type: 'stale', text: 'Stale data' }
       }
-      
+
       totalPages.value = Math.ceil(data.length / itemsPerPage.value)
       console.log('✅ Loaded from cache:', data.length, 'transactions, age:', ageInMinutes, 'minutes')
       return true
@@ -551,10 +480,10 @@ const fetchFromAPI = async (forceRefresh = false) => {
   loading.value = true
   if (forceRefresh) refreshing.value = true
   error.value = null
-  
+
   try {
     const token = getAuthToken()
-    
+
     const response = await fetch(`${API_BASE_URL}/fetch`, {
       method: 'POST',
       headers: {
@@ -566,19 +495,19 @@ const fetchFromAPI = async (forceRefresh = false) => {
         page: "0"
       })
     })
-    
+
     const data = await response.json()
-    
+
     if (data.code === '200') {
       const content = data.data.content || []
       transactions.value = content
       totalPages.value = Math.ceil(content.length / itemsPerPage.value)
       saveToCache(content)
-      
+
       if (forceRefresh) {
         notification.success('Data refreshed successfully')
       }
-      
+
       console.log('✅ API fetch successful:', content.length, 'transactions')
     } else {
       throw new Error(data.message || 'Failed to fetch transactions')
@@ -609,12 +538,12 @@ onMounted(() => {
 const createTransaction = async () => {
   try {
     const token = getAuthToken()
-    
+
     // Set default lot_size to 0.01 if not provided or if it's empty
-    const lotSize = form.lot_size && !isNaN(parseFloat(form.lot_size)) 
-      ? parseFloat(form.lot_size) 
+    const lotSize = form.lot_size && !isNaN(parseFloat(form.lot_size))
+      ? parseFloat(form.lot_size)
       : 0.01
-    
+
     const payload = {
       symbol: form.symbol || '', // Include symbol (required)
       currency: form.currency,    // Required
@@ -622,15 +551,15 @@ const createTransaction = async () => {
       pnl: parseFloat(form.pnl),  // Required
       type: form.type.toLowerCase() // Required
     }
-    
+
     // Add optional date if provided - FORMAT: DD/MM/YYYY
     if (form.date) {
       const [year, month, day] = form.date.split('-')
       payload.inp_date = `${day}/${month}/${year}` // DD/MM/YYYY format
     }
-    
+
     console.log('📤 Creating transaction with payload:', payload)
-    
+
     const response = await fetch(`${API_BASE_URL}/create`, {
       method: 'POST',
       headers: {
@@ -639,9 +568,9 @@ const createTransaction = async () => {
       },
       body: JSON.stringify(payload)
     })
-    
+
     const data = await response.json()
-    
+
     if (data.code === '200') {
       notification.success('Transaction created successfully')
       await fetchFromAPI(true)
@@ -658,13 +587,13 @@ const createTransaction = async () => {
 const updateTransaction = async () => {
   try {
     const token = getAuthToken()
-    
+
     const payload = { sn: form.sn }
     if (form.symbol) payload.symbol = form.symbol
     if (form.lot_size) payload.lot_size = parseFloat(form.lot_size).toString()
     if (form.currency) payload.currency = form.currency
     if (form.pnl) payload.pnl = parseFloat(form.pnl)
-    
+
     const response = await fetch(`${API_BASE_URL}/update`, {
       method: 'POST',
       headers: {
@@ -673,9 +602,9 @@ const updateTransaction = async () => {
       },
       body: JSON.stringify(payload)
     })
-    
+
     const data = await response.json()
-    
+
     if (data.code === '200') {
       notification.success('Transaction updated successfully')
       await fetchFromAPI(true)
@@ -692,7 +621,7 @@ const updateTransaction = async () => {
 const deleteTransaction = async () => {
   try {
     const token = getAuthToken()
-    
+
     const response = await fetch(`${API_BASE_URL}/delete`, {
       method: 'POST',
       headers: {
@@ -701,9 +630,9 @@ const deleteTransaction = async () => {
       },
       body: JSON.stringify({ sn: selectedTransaction.value.sn })
     })
-    
+
     const data = await response.json()
-    
+
     if (data.code === '200') {
       notification.success('Transaction deleted successfully')
       await fetchFromAPI(true)
@@ -773,11 +702,11 @@ const summary = computed(() => {
   const totalProfit = transactions.value
     .filter(t => t.type === 'PROFIT')
     .reduce((sum, t) => sum + t.pnl, 0)
-  
+
   const totalLoss = transactions.value
     .filter(t => t.type === 'LOSS')
     .reduce((sum, t) => sum + t.pnl, 0)
-  
+
   return {
     totalProfit,
     totalLoss,
@@ -803,11 +732,11 @@ const formatCurrency = (value) => {
 const formatTransactionAmount = (transaction) => {
   if (!transaction) return '-'
   const amount = transaction.pnl || 0
-  
+
   if (transaction.type === 'PROFIT' || transaction.type === 'LOSS') {
     return amount
   }
-  
+
   return `${amount}`
 }
 
@@ -831,13 +760,13 @@ const formatDate = (dateString) => {
 
 const formatTimeAgo = (timestamp) => {
   if (!timestamp) return ''
-  
+
   const now = new Date()
   const diffMs = now - new Date(timestamp)
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMins / 60)
   const diffDays = Math.floor(diffHours / 24)
-  
+
   if (diffMins < 1) return 'just now'
   if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`
   if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
@@ -907,9 +836,9 @@ const closeDeleteModal = () => {
 const handleSubmit = async () => {
   // Validation
 
-  
+
   submitting.value = true
-  
+
   try {
     if (modalMode.value === 'create') {
       await createTransaction()
@@ -926,7 +855,7 @@ const handleSubmit = async () => {
 
 const handleDelete = async () => {
   submitting.value = true
-  
+
   try {
     await deleteTransaction()
     closeDeleteModal()
@@ -939,5 +868,5 @@ const handleDelete = async () => {
 </script>
 
 <style scoped>
-  @import '../assets/styles/transaction.css';
+@import '../assets/styles/transaction.css';
 </style>
