@@ -564,7 +564,7 @@ const fetchFromAPI = async (forceRefresh = false) => {
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
-        size: 100,
+        size: 10,
         page: "0"
       })
     })
