@@ -16,7 +16,7 @@
         <input 
           type="text" 
           v-model="searchQuery" 
-          placeholder="Search by username..." 
+          placeholder="Search by username or email..." 
           class="search-input"
           @input="filterUsers"
         />
@@ -46,6 +46,7 @@
               <div class="user-avatar">{{ user.username.charAt(0).toUpperCase() }}</div>
               <div class="user-details">
                 <span class="username">{{ user.username }}</span>
+                <span class="user-email">{{ user.email || 'No email' }}</span>
                 <span class="user-id">ID: {{ user.id }}</span>
               </div>
             </div>
@@ -84,6 +85,7 @@
           <tr>
             <th>ID</th>
             <th>Username</th>
+            <th>Email</th>
             <th>Status</th>
             <th>Created At</th>
             <th>Last Updated</th>
@@ -92,7 +94,7 @@
         </thead>
         <tbody>
           <tr v-if="filteredUsers.length === 0">
-            <td colspan="6" class="no-data">No users found</td>
+            <td colspan="7" class="no-data">No users found</td>
           </tr>
           <tr v-for="user in paginatedUsers" :key="user.id" class="user-row">
             <td>{{ user.id }}</td>
@@ -100,6 +102,12 @@
               <div class="username-info">
                 <div class="user-avatar">{{ user.username.charAt(0).toUpperCase() }}</div>
                 <span class="username-text">{{ user.username }}</span>
+              </div>
+            </td>
+            <td class="email-cell">
+              <div class="email-info">
+                <span class="email-icon">📧</span>
+                <span class="email-text">{{ user.email || '—' }}</span>
               </div>
             </td>
             <td>
@@ -166,6 +174,17 @@
           </div>
 
           <div class="form-group">
+            <label for="email">Email</label>
+            <input 
+              type="email" 
+              id="email"
+              v-model="userForm.email" 
+              placeholder="Enter email address"
+            />
+            <small class="hint">Optional: User's email address for notifications</small>
+          </div>
+
+          <div class="form-group">
             <label for="password">Password *</label>
             <input 
               type="password" 
@@ -201,6 +220,7 @@
         
         <div class="modal-subheader" v-if="selectedUser">
           <span class="subheader-text">User: <strong>{{ selectedUser.username }}</strong></span>
+          <span v-if="selectedUser.email" class="subheader-email">{{ selectedUser.email }}</span>
         </div>
 
         <form @submit.prevent="handlePasswordChange" class="modal-form">
@@ -263,6 +283,7 @@
         <div class="delete-content">
           <div class="delete-icon">⚠️</div>
           <p class="delete-message">Are you sure you want to delete user <strong>{{ selectedUser?.username }}</strong>?</p>
+          <p v-if="selectedUser?.email" class="delete-email">{{ selectedUser.email }}</p>
           <p class="warning">This action cannot be undone.</p>
         </div>
 
@@ -310,6 +331,7 @@ const selectedUser = ref(null)
 // Forms
 const userForm = reactive({
   username: '',
+  email: '',
   password: ''
 })
 
@@ -323,8 +345,10 @@ const passwordForm = reactive({
 const filteredUsers = computed(() => {
   if (!searchQuery.value) return users.value
   
+  const query = searchQuery.value.toLowerCase()
   return users.value.filter(user => 
-    user.username.toLowerCase().includes(searchQuery.value.toLowerCase())
+    user.username.toLowerCase().includes(query) ||
+    (user.email && user.email.toLowerCase().includes(query))
   )
 })
 
@@ -414,13 +438,23 @@ const registerUser = async (userData) => {
   try {
     const token = getAuthToken()
     
+    const payload = {
+      username: userData.username,
+      password: userData.password
+    }
+    
+    // Add email if provided
+    if (userData.email) {
+      payload.email = userData.email
+    }
+    
     const response = await fetch(`${API_BASE_URL}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token && { 'Authorization': `Bearer ${token}` })
       },
-      body: JSON.stringify(userData)
+      body: JSON.stringify(payload)
     })
     
     const data = await response.json()
@@ -505,6 +539,7 @@ const deleteUser = async (id) => {
 // Modal handlers
 const openCreateModal = () => {
   userForm.username = ''
+  userForm.email = ''
   userForm.password = ''
   showUserModal.value = true
 }
@@ -525,6 +560,7 @@ const confirmDelete = (user) => {
 const closeModal = () => {
   showUserModal.value = false
   userForm.username = ''
+  userForm.email = ''
   userForm.password = ''
 }
 
@@ -558,6 +594,7 @@ const handleUserSubmit = async () => {
   try {
     await registerUser({
       username: userForm.username,
+      email: userForm.email,
       password: userForm.password
     })
     closeModal()

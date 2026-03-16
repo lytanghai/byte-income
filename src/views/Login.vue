@@ -49,9 +49,9 @@
 
       <!-- Form Section -->
       <form @submit.prevent="handleSubmit" class="login-form">
-        <!-- Username -->
+        <!-- Username/Email Field -->
         <div class="form-group" :class="{ 'field-error': errors.username }">
-          <label for="username" class="form-label">Username</label>
+          <label for="username" class="form-label">Username or Email</label>
           <div class="input-wrapper">
             <svg class="input-icon" viewBox="0 0 20 20" fill="currentColor">
               <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
@@ -63,7 +63,7 @@
               @blur="validateField('username')"
               class="form-input"
               :class="{ error: errors.username }"
-              placeholder="Enter Your Username"
+              placeholder="Enter your username or email"
               :disabled="showTerminal"
             />
           </div>
@@ -194,9 +194,15 @@ const errors = reactive({
   password: ''
 })
 
+// Email validation regex
+const isEmail = (value) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(value)
+}
+
 const validateUsername = (username) => {
-  if (!username) return 'Username is required'
-  if (username.length < 3) return 'Username must be at least 3 characters'
+  if (!username) return 'Username or email is required'
+  if (username.length < 3) return 'Must be at least 3 characters'
   return ''
 }
 
@@ -221,13 +227,30 @@ const isFormValid = computed(() => formData.username && formData.password && !er
 
 const loginUser = async (credentials) => {
   try {
+    // The API might accept either username or email in the same field
+    // If your API has separate fields for username and email, you might need to adjust this
+    const payload = {
+      username: credentials.username, // This could be either username or email
+      password: credentials.password
+    }
+    
+    // Optional: Add a flag if your API needs to know it's an email
+    // if (isEmail(credentials.username)) {
+    //   payload.login_type = 'email'
+    // }
+
     const response = await fetch(API_BASE_URL + '/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(credentials)
+      body: JSON.stringify(payload)
     })
+    
     const data = await response.json()
-    if (!response.ok || data.code !== '200') throw new Error(data.message || 'Login failed')
+    
+    if (!response.ok || data.code !== '200') {
+      throw new Error(data.message || 'Login failed')
+    }
+    
     return data.data
   } catch (err) {
     throw err
@@ -247,6 +270,9 @@ const startAISequence = async () => {
   showTerminal.value = true
   clearTerminal()
   
+  // Determine if user logged in with email or username
+  const loginMethod = isEmail(formData.username) ? 'EMAIL' : 'USERNAME'
+  
   // Initializing sequence
   addTerminalLine('>', 'INITIALIZING SECURE CONNECTION...')
   await new Promise(resolve => setTimeout(resolve, 800))
@@ -257,7 +283,7 @@ const startAISequence = async () => {
   addTerminalLine('>', 'VERIFYING CREDENTIALS...')
   await new Promise(resolve => setTimeout(resolve, 500))
   
-  addTerminalLine('>', `AUTHENTICATING USER: ${formData.username.toUpperCase()}`, true)
+  addTerminalLine('>', `AUTHENTICATING ${loginMethod}: ${formData.username.toUpperCase()}`, true)
   await new Promise(resolve => setTimeout(resolve, 1000))
   
   // Show progress bar
@@ -295,14 +321,24 @@ const handleSubmit = async () => {
   loginError.value = ''
 
   try {
-    const data = await loginUser({ username: formData.username, password: formData.password })
+    const data = await loginUser({ 
+      username: formData.username, 
+      password: formData.password 
+    })
     
     // Store auth data
     localStorage.setItem('authToken', data.token)
     localStorage.setItem('isAuthenticated', 'true')
-    localStorage.setItem('userData', JSON.stringify({ username: data.username }))
-    if (formData.rememberMe) localStorage.setItem('rememberMe', 'true')
-    else localStorage.removeItem('rememberMe')
+    localStorage.setItem('userData', JSON.stringify({ 
+      username: data.username,
+      email: data.email || null 
+    }))
+    
+    if (formData.rememberMe) {
+      localStorage.setItem('rememberMe', 'true')
+    } else {
+      localStorage.removeItem('rememberMe')
+    }
     
     // Start AI terminal sequence
     isLoading.value = false
