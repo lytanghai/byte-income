@@ -118,11 +118,11 @@
             </div>
             <div class="stat-row">
               <span class="stat-name">Deposits</span>
-              <span class="stat-value">{{ formatCurrency(summaryData.transactions?.totalDeposit / 100).toFixed(2) }}</span>
+              <span class="stat-value">${{ formatCurrency(summaryData.transactions?.totalDeposit / 100) }}</span>
             </div>
             <div class="stat-row">
               <span class="stat-name">Withdrawals</span>
-              <span class="stat-value">{{ formatCurrency(summaryData.transactions?.totalWithdrawal / 100).toFixed(2) }}</span>
+              <span class="stat-value">${{ formatCurrency(summaryData.transactions?.totalWithdrawal / 100) }}</span>
             </div>
           </div>
         </div>
