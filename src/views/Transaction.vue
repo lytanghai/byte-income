@@ -146,7 +146,7 @@
               <td :class="getAmountClass(transaction)">
                 {{ formatTransactionAmount(transaction) }}
               </td>
-              <td>{{ transaction.currency }}</td>
+              {{ transaction.currency }} ({{ transaction.currency === 'USD' ? '$' : '¢' }})
               <td class="date-cell">{{ formatDate(transaction.date) }}</td>
               <td class="actions-cell">
                 <button class="action-btn edit" @click="openEditModal(transaction)" title="Edit">
