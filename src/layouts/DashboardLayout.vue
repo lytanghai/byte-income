@@ -330,13 +330,13 @@ const playNotificationSound = () => {
 // Start polling every 30 seconds
 const startPolling = () => {
     // Load from cache first
-    loadNotificationsFromCache()
+    // loadNotificationsFromCache()
     
     // Fetch immediately
-    fetchUnreadNotifications()
+    // fetchUnreadNotifications()
     
     // Then poll every 30 seconds
-    pollingInterval = setInterval(fetchUnreadNotifications, 30000) // 30 seconds
+    // pollingInterval = setInterval(fetchUnreadNotifications, 30000) // 30 seconds
 }
 
 /* Theme toggle */
