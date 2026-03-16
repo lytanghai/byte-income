@@ -97,6 +97,26 @@
           </div>
         </div>
 
+         <div class="summary-card">
+          <div class="summary-icon">📊</div>
+          <div class="summary-content">
+            <span class="summary-label">Total Deposit</span>
+            <span class="summary-value profit">
+              {{ formatCurrency(totalSummary.totalDeposit) }}
+            </span>
+          </div>
+        </div>
+
+        <div class="summary-card">
+          <div class="summary-icon">📊</div>
+          <div class="summary-content">
+            <span class="summary-label">Total Withdrawal</span>
+            <span class="summary-value profit">
+              {{ formatCurrency(totalSummary.totalWithdrawal) }}
+            </span>
+          </div>
+        </div>
+
         <div class="summary-card">
           <div class="summary-icon">🏆</div>
           <div class="summary-content">
@@ -110,14 +130,7 @@
           <div class="summary-content">
             <span class="summary-label">Period</span>
             <span class="summary-value">{{ lastNDays }} days</span>
-          </div>
-        </div>
-
-        <div class="summary-card">
-          <div class="summary-icon">🔄</div>
-          <div class="summary-content">
-            <span class="summary-label">Transactions</span>
-            <span class="summary-value">{{ reportData.length }}</span>
+            <span class="summary-label">Transactions: <span class="summary-value">{{ reportData.length }}</span></span>
           </div>
         </div>
       </div>

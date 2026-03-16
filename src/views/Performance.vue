@@ -337,11 +337,11 @@ const months = [
   { value: 12, label: 'December' }
 ]
 
-// Years (last 5 years to next year)
+// Years (last n years to next year)
 const currentYear = new Date().getFullYear()
 const years = computed(() => {
   const years = []
-  for (let i = currentYear - 5; i <= currentYear + 1; i++) {
+  for (let i = currentYear - 1; i <= currentYear + 5; i++) {
     years.push(i)
   }
   return years
