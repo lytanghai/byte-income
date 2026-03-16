@@ -548,8 +548,6 @@ const loadFromCache = () => {
 
 // ============== API CALLS ==============
 const fetchFromAPI = async (forceRefresh = false) => {
-  console.log('📡 Fetching from API...')
-  
   loading.value = true
   if (forceRefresh) refreshing.value = true
   error.value = null
@@ -564,7 +562,7 @@ const fetchFromAPI = async (forceRefresh = false) => {
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
-        size: 10,
+        size: 100,
         page: "0"
       })
     })
