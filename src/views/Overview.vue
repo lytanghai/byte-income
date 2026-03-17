@@ -27,7 +27,7 @@
           <div class="card-content">
             <span class="card-label">Net P&L</span>
             <span class="card-value" :class="getPnLClass(summaryData.netPnL)">
-              ${{ (summaryData.netPnL / 100).toFixed(2)}} ≃ ¢{{ (summaryData.netPnL).toFixed(2) }} 
+              ${{ (summaryData.netPnL / 100).toFixed(2)}} 
             </span>
           </div>
         </div>
@@ -201,7 +201,7 @@
                   <span class="tx-type" :class="tx.type.toLowerCase()">{{ tx.type }}</span>
                 </div>
                 <span class="tx-amount" :class="tx.type.toLowerCase()">
-                  ¢{{ (tx.pnl / 100).toFixed(2) }}
+                  ¢{{ (tx.pnl) }}
                 </span>
               </div>
             </div>
