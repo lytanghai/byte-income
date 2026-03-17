@@ -3,14 +3,20 @@
     <!-- Header -->
     <div class="page-header">
       <h1>Transaction Management</h1>
-      <p class="subtitle">Create, view, update and delete trading transactions</p>
+      <p class="subtitle">Create, view, update and delete trading transactions</p> <br>
+      <p>Record only last for 150 transactions only</p>
     </div>
 
-    <!-- Action Bar with Create and Refresh Buttons -->
+    <!-- Action Bar with Create, Merge and Refresh Buttons -->
     <div class="action-bar">
-      <button class="btn btn-primary" @click="openCreateModal">
-        <span class="btn-icon">+</span> Add New Transaction
-      </button>
+      <div class="action-buttons-left">
+        <button class="btn btn-primary" @click="openCreateModal">
+          <span class="btn-icon">+</span> Add New Transaction
+        </button>
+        <button class="btn btn-merge" @click="openMergeModal" :disabled="merging">
+          <span class="btn-icon">🔄</span> Merge Transactions
+        </button>
+      </div>
 
       <div class="action-group">
         <!-- Cache Status -->
@@ -102,7 +108,7 @@
         <div class="card-icon">📋</div>
         <div class="card-content">
           <span class="card-label">Total Transactions</span>
-          <span class="card-value">{{ summary.totalCount }}</span>
+          <span class="card-value">{{ summary.totalCount }}/150</span>
         </div>
       </div>
     </div>
@@ -146,7 +152,7 @@
               <td :class="getAmountClass(transaction)">
                 {{ formatTransactionAmount(transaction) }}
               </td>
-              {{ transaction.currency }} ({{ transaction.currency === 'USD' ? '$' : '¢' }})
+              <td>{{ transaction.currency }} ({{ transaction.currency === 'USD' ? '$' : '¢' }})</td>
               <td class="date-cell">{{ formatDate(transaction.date) }}</td>
               <td class="actions-cell">
                 <button class="action-btn edit" @click="openEditModal(transaction)" title="Edit">
@@ -280,6 +286,54 @@
       </div>
     </div>
 
+    <!-- Merge Transactions Modal -->
+    <div v-if="showMergeModal" class="modal-overlay" @click="closeMergeModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h2>Merge Transactions</h2>
+          <button class="close-btn" @click="closeMergeModal">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <p class="merge-description">
+            This will merge all transactions from the selected date into a single consolidated transaction.
+          </p>
+
+          <div class="form-group">
+            <label for="merge-date">Select Date *</label>
+            <input type="date" id="merge-date" v-model="mergeDate" class="form-input" />
+            <small class="hint">All transactions on this date will be merged</small>
+          </div>
+
+          <div v-if="selectedDateTransactions.length > 0" class="preview-section">
+            <h4>Transactions to be merged:</h4>
+            <div class="preview-list">
+              <div v-for="tx in selectedDateTransactions" :key="tx.sn" class="preview-item">
+                <span class="preview-symbol">{{ tx.symbol || '-' }}</span>
+                <span class="preview-type" :class="tx.type.toLowerCase()">{{ tx.type }}</span>
+                <span class="preview-amount" :class="getAmountClass(tx)">
+                  {{ formatTransactionAmount(tx) }} {{ tx.currency }}
+                </span>
+              </div>
+            </div>
+            <div class="preview-total">
+              <strong>Total: {{ selectedDateTransactions.length }} transactions</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="closeMergeModal" :disabled="merging">
+            Cancel
+          </button>
+          <button type="button" class="btn btn-merge" @click="handleMerge" :disabled="!mergeDate || merging">
+            <span v-if="merging" class="spinner-small"></span>
+            {{ merging ? 'Merging...' : 'Merge Transactions' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Delete Confirmation Modal -->
     <div v-if="showDeleteModal" class="modal-overlay" @click="closeDeleteModal">
       <div class="modal-content confirm-delete" @click.stop>
@@ -335,11 +389,11 @@ const CACHE_TIMESTAMP_KEY = 'transaction_cache_timestamp'
 const transactions = ref([])
 const loading = ref(false)
 const refreshing = ref(false)
+const merging = ref(false)
 const error = ref(null)
 const submitting = ref(false)
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
-// const totalPages = ref(1)
 const totalPages = computed(() => {
   return Math.ceil(filteredTransactions.value.length / itemsPerPage.value) || 1
 })
@@ -349,8 +403,10 @@ const cacheStatus = ref({ type: 'fresh', text: 'Loading...' })
 // Modal states
 const showTransactionModal = ref(false)
 const showDeleteModal = ref(false)
+const showMergeModal = ref(false)
 const modalMode = ref('create')
 const selectedTransaction = ref(null)
+const mergeDate = ref('')
 
 // Form state
 const form = reactive({
@@ -407,6 +463,24 @@ const amountPlaceholder = computed(() => {
   }
 })
 
+// Transactions on selected merge date
+const selectedDateTransactions = computed(() => {
+  if (!mergeDate.value) return []
+
+  // Convert YYYY-MM-DD to DD/MM/YYYY for comparison
+  const [year, month, day] = mergeDate.value.split('-')
+  const targetDateStr = `${day}/${month}/${year}`
+
+  return transactions.value.filter(tx => {
+    const txDate = new Date(tx.date)
+    const txDay = String(txDate.getDate()).padStart(2, '0')
+    const txMonth = String(txDate.getMonth() + 1).padStart(2, '0')
+    const txYear = txDate.getFullYear()
+    const txDateStr = `${txDay}/${txMonth}/${txYear}`
+    return txDateStr === targetDateStr
+  })
+})
+
 // Handle type change
 const handleTypeChange = () => {
   if (!isTradingType.value) {
@@ -428,7 +502,6 @@ const getAuthToken = () => {
 // ============== CACHE MANAGEMENT ==============
 const saveToCache = (data) => {
   try {
-
     saveCacheData(CACHE_KEY, JSON.stringify(data), 5)
 
     const timestamp = new Date().toISOString()
@@ -461,7 +534,6 @@ const loadFromCache = () => {
         cacheStatus.value = { type: 'stale', text: 'Stale data' }
       }
 
-      totalPages.value = Math.ceil(data.length / itemsPerPage.value)
       console.log('✅ Loaded from cache:', data.length, 'transactions, age:', ageInMinutes, 'minutes')
       return true
     }
@@ -487,7 +559,7 @@ const fetchFromAPI = async (forceRefresh = false) => {
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
-        size: 100,
+        size: 150,
         page: "0"
       })
     })
@@ -497,7 +569,6 @@ const fetchFromAPI = async (forceRefresh = false) => {
     if (data.code === '200') {
       const content = data.data.content || []
       transactions.value = content
-      totalPages.value = Math.ceil(content.length / itemsPerPage.value)
       saveToCache(content)
 
       if (forceRefresh) {
@@ -515,6 +586,45 @@ const fetchFromAPI = async (forceRefresh = false) => {
   } finally {
     loading.value = false
     refreshing.value = false
+  }
+}
+
+// Merge transactions
+const mergeTransactions = async () => {
+  try {
+    const token = getAuthToken()
+
+    // Format date from YYYY-MM-DD to DD/MM/YYYY
+    const [year, month, day] = mergeDate.value.split('-')
+    const formattedDate = `${day}/${month}/${year}`
+
+    const payload = {
+      date: formattedDate
+    }
+
+    console.log('🔄 Merging transactions with payload:', payload)
+
+    const response = await fetch(`${API_BASE_URL}/merge-transaction`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    })
+
+    const data = await response.json()
+
+    if (data.code === '200') {
+      notification.success(data.message || 'Transactions merged successfully')
+      await fetchFromAPI(true) // Refresh after merge
+      return true
+    } else {
+      throw new Error(data.message || 'Failed to merge transactions')
+    }
+  } catch (err) {
+    notification.error(err.message)
+    throw err
   }
 }
 
@@ -672,6 +782,40 @@ const resetFilters = () => {
   filters.currency = ''
   filters.date = ''
   currentPage.value = 1
+}
+
+// Merge modal handlers
+const openMergeModal = () => {
+  mergeDate.value = ''
+  showMergeModal.value = true
+}
+
+const closeMergeModal = () => {
+  showMergeModal.value = false
+  mergeDate.value = ''
+}
+
+const handleMerge = async () => {
+  if (!mergeDate.value) {
+    notification.error('Please select a date')
+    return
+  }
+
+  if (selectedDateTransactions.value.length === 0) {
+    notification.error('No transactions found for this date')
+    return
+  }
+
+  merging.value = true
+
+  try {
+    await mergeTransactions()
+    closeMergeModal()
+  } catch (err) {
+    // Error handled in mergeTransactions
+  } finally {
+    merging.value = false
+  }
 }
 
 // ============== COMPUTED ==============
@@ -834,9 +978,6 @@ const closeDeleteModal = () => {
 
 // ============== FORM SUBMISSIONS ==============
 const handleSubmit = async () => {
-  // Validation
-
-
   submitting.value = true
 
   try {
@@ -869,4 +1010,7 @@ const handleDelete = async () => {
 
 <style scoped>
 @import '../assets/styles/transaction.css';
+
+/* Additional styles for merge functionality */
+
 </style>
