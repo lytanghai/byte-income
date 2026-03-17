@@ -93,7 +93,7 @@
         <div class="card-content">
           <span class="card-label">Net P&L</span>
           <span class="card-value" :class="getProfitClass(summary.netPnL)">
-            ¢{{ (summary.netPnL / 100).toFixed(2) }}
+            ${{ (summary.netPnL / 100).toFixed(2) }}
           </span>
         </div>
       </div>
