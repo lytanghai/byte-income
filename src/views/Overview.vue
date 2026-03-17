@@ -27,7 +27,7 @@
           <div class="card-content">
             <span class="card-label">Net P&L</span>
             <span class="card-value" :class="getPnLClass(summaryData.netPnL)">
-              ${{ (summaryData.netPnL / 100).toFixed(2)}} ≃ ¢{{summaryData.netPnL}} 
+              ${{ (summaryData.netPnL / 100).toFixed(2)}} ≃ ¢{{ (summaryData.netPnL).toFixed(2) }} 
             </span>
           </div>
         </div>
@@ -110,11 +110,11 @@
           <div class="stat-body">
             <div class="stat-row">
               <span class="stat-name">Total Profit</span>
-              <span class="stat-value profit">¢{{ summaryData.transactions?.totalProfit }} ≃ ${{ (summaryData.transactions?.totalProfit / 100).toFixed(2) }}</span>
+              <span class="stat-value profit">¢{{ (summaryData.transactions?.totalProfit).toFixed(2) }} ≃ ${{ (summaryData.transactions?.totalProfit / 100).toFixed(2) }}</span>
             </div>
             <div class="stat-row">
               <span class="stat-name">Total Loss</span>
-              <span class="stat-value loss">¢{{ summaryData.transactions?.totalLoss }} ≃ ${{ (summaryData.transactions?.totalLoss / 100).toFixed(2) }}</span>
+              <span class="stat-value loss">¢{{ (summaryData.transactions?.totalLoss).toFixed(2) }} ≃ ${{ (summaryData.transactions?.totalLoss / 100).toFixed(2) }}</span>
             </div>
             <div class="stat-row">
               <span class="stat-name">Deposits</span>
