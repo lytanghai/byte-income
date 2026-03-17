@@ -17,20 +17,23 @@
           </button>
         </div>
 
-        <!-- Category Filter -->
+        <!-- Category Filter (Optional) -->
         <div class="filter-group">
-          <label class="filter-label">Category *</label>
-          <select v-model="filters.category" class="filter-select" :class="{ 'error': categoryError }">
-            <option value="">Select Category</option>
-            <option value="GENERAL">General</option>
-            <option value="GOLD">Gold</option>
-            <option value="DXY">DXY (Dollar Index)</option>
-            <option value="WAR">War</option>
-            <option value="CRIME">Crime</option>
-            <option value="US_ECONOMIC">US Economic</option>
-            <option value="OIL">Oil</option>
+          <label class="filter-label">Category</label>
+          <select v-model="filters.category" class="filter-select">
+            <option value="">Any Category</option>
+            <option value="war">War</option>
+            <option value="crime">Crime</option>
+            <option value="fomc">FOMC</option>
+            <option value="gold">Gold</option>
+            <option value="oil">Oil</option>
+            <option value="financial">Financial</option>
+            <option value="economy">Economy</option>
+            <option value="markets">Markets</option>
+            <option value="tech">Technology</option>
+            <option value="crypto">Cryptocurrency</option>
           </select>
-          <small v-if="categoryError" class="error-hint">{{ categoryError }}</small>
+          <!-- <small class="hint">Leave empty to search by keyword only</small> -->
         </div>
 
         <!-- Last Updated Filter -->
@@ -39,58 +42,21 @@
           <select v-model="filters.last_updated" class="filter-select">
             <option value="">Any Time</option>
             <option value="1h">Last hour</option>
-            <option value="6h">Last 6 hours</option>
+            <option value="2h">Last 2 hours</option>
+            <option value="4h">Last 4 hours</option>
             <option value="12h">Last 12 hours</option>
             <option value="24h">Last 24 hours</option>
             <option value="7d">Last 7 days</option>
           </select>
         </div>
 
-        <!-- Market Filter -->
+        <!-- Source Filter -->
         <div class="filter-group">
-          <label class="filter-label">Market</label>
-          <select v-model="filters.market" @change="applyFilters" class="filter-select">
-            <option value="">All Markets</option>
-            <option v-for="market in markets" :key="market" :value="market">
-              {{ market }}
-            </option>
-          </select>
-        </div>
-
-        <!-- Impact Filter -->
-        <div class="filter-group">
-          <label class="filter-label">Impact</label>
-          <div class="impact-options">
-            <label class="impact-option">
-              <input type="radio" v-model="filters.impact" value="" @change="applyFilters">
-              <span>All</span>
-            </label>
-            <label class="impact-option">
-              <input type="radio" v-model="filters.impact" value="High" @change="applyFilters">
-              <span class="impact-high">High</span>
-            </label>
-            <label class="impact-option">
-              <input type="radio" v-model="filters.impact" value="Medium" @change="applyFilters">
-              <span class="impact-medium">Medium</span>
-            </label>
-            <label class="impact-option">
-              <input type="radio" v-model="filters.impact" value="Low" @change="applyFilters">
-              <span class="impact-low">Low</span>
-            </label>
-            <label class="impact-option">
-              <input type="radio" v-model="filters.impact" value="Holiday" @change="applyFilters">
-              <span class="impact-holiday">Holiday</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Country Filter -->
-        <div class="filter-group">
-          <label class="filter-label">Country/Currency</label>
-          <select v-model="filters.country" @change="applyFilters" class="filter-select">
-            <option value="">All Countries</option>
-            <option v-for="country in countries" :key="country" :value="country">
-              {{ country }}
+          <label class="filter-label">Source</label>
+          <select v-model="filters.source" @change="applyFilters" class="filter-select">
+            <option value="">All Sources</option>
+            <option v-for="source in sources" :key="source" :value="source">
+              {{ source }}
             </option>
           </select>
         </div>
@@ -108,17 +74,7 @@
             />
             <button v-if="filters.keyword" @click="clearKeyword" class="clear-btn">✕</button>
           </div>
-        </div>
-
-        <!-- Source Filter -->
-        <div class="filter-group">
-          <label class="filter-label">Source</label>
-          <select v-model="filters.source" @change="applyFilters" class="filter-select">
-            <option value="">All Sources</option>
-            <option v-for="source in sources" :key="source" :value="source">
-              {{ source }}
-            </option>
-          </select>
+          <!-- <small class="hint">If no category selected, keyword will be used as search term</small> -->
         </div>
 
         <!-- Search Button -->
@@ -126,12 +82,15 @@
           <button 
             @click="handleSearch" 
             class="btn-search" 
-            :disabled="!isSearchValid || newsLoading"
+            :disabled="(!filters.category && !filters.keyword) || newsLoading"
           >
             <span v-if="newsLoading" class="spinner-small"></span>
             <span class="btn-icon">🔍</span>
             {{ newsLoading ? 'Searching...' : 'Search News' }}
           </button>
+          <small v-if="!filters.category && !filters.keyword" class="error-hint">
+            Enter a category or keyword to search
+          </small>
         </div>
 
         <!-- Active Filters -->
@@ -139,27 +98,15 @@
           <div class="active-filters-title">Active Filters:</div>
           <div class="filter-tags">
             <span v-if="filters.category" class="filter-tag">
-              {{ filters.category }}
-              <button @click="filters.category = ''; validateCategory()">✕</button>
+              Category: {{ filters.category }}
+              <button @click="filters.category = ''">✕</button>
             </span>
             <span v-if="filters.last_updated" class="filter-tag">
               Last {{ filters.last_updated }}
               <button @click="filters.last_updated = ''">✕</button>
             </span>
-            <span v-if="filters.market" class="filter-tag">
-              {{ filters.market }}
-              <button @click="filters.market = ''; applyFilters()">✕</button>
-            </span>
-            <span v-if="filters.impact" class="filter-tag">
-              {{ filters.impact }}
-              <button @click="filters.impact = ''; applyFilters()">✕</button>
-            </span>
-            <span v-if="filters.country" class="filter-tag">
-              {{ filters.country }}
-              <button @click="filters.country = ''; applyFilters()">✕</button>
-            </span>
             <span v-if="filters.source" class="filter-tag">
-              {{ filters.source }}
+              Source: {{ filters.source }}
               <button @click="filters.source = ''; applyFilters()">✕</button>
             </span>
             <span v-if="filters.keyword" class="filter-tag">
@@ -220,10 +167,10 @@
           <div v-if="!hasSearched" class="initial-state">
             <div class="initial-icon">🔍</div>
             <h3>Search for News</h3>
-            <p>Select a category and click Search to find relevant news articles</p>
+            <p>Enter a category or keyword to find relevant news articles</p>
             <div class="search-hint">
-              <span class="hint-item">• Category is required</span>
-              <span class="hint-item">• You can add filters for better results</span>
+              <span class="hint-item">• Select a category OR enter a keyword</span>
+              <span class="hint-item">• You can add time filters for better results</span>
             </div>
           </div>
 
@@ -246,53 +193,23 @@
             </div>
 
             <div 
-              v-for="(news, index) in paginatedNews" 
+              v-for="(item, index) in paginatedNews" 
               :key="index" 
               class="news-card"
-              :class="getImpactClass(news.impact)"
             >
               <!-- Card Header -->
               <div class="news-header">
                 <div class="news-meta">
-                  <span class="news-source" :class="getSourceClass(news.source)">
-                    {{ news.source }}
-                  </span>
-                  <span class="news-category">{{ news.category }}</span>
-                  <span class="news-impact" :class="getImpactClass(news.impact)">
-                    {{ news.impact }}
-                  </span>
+                  <span class="news-source">{{ item.source }}</span>
                 </div>
-                <span class="news-time">{{ formatTimeAgo(news.published_at) }}</span>
               </div>
 
               <!-- Card Title -->
               <h3 class="news-title">
-                <a :href="news.link" target="_blank" rel="noopener noreferrer">
-                  {{ news.title }}
+                <a :href="item.link" target="_blank" rel="noopener noreferrer">
+                  {{ item.title }}
                 </a>
               </h3>
-
-              <!-- Card Description -->
-              <p class="news-description" v-html="truncateDescription(news.description)"></p>
-
-              <!-- Card Footer -->
-              <div class="news-footer">
-                <div class="market-tags">
-                  <span 
-                    v-for="tag in news.market_tags" 
-                    :key="tag" 
-                    class="market-tag"
-                  >
-                    {{ tag }}
-                  </span>
-                  <span v-if="news.market_tags.length === 0" class="no-tags">
-                    No market tags
-                  </span>
-                </div>
-                <a :href="news.link" target="_blank" rel="noopener noreferrer" class="read-more">
-                  Read More →
-                </a>
-              </div>
             </div>
 
             <!-- Pagination -->
@@ -321,7 +238,7 @@
           <div v-else-if="hasSearched && allNews.length === 0" class="no-results">
             <div class="no-results-icon">📭</div>
             <h3>No News Found</h3>
-            <p>Try adjusting your filters or search for a different category</p>
+            <p>Try adjusting your filters or search for a different term</p>
           </div>
         </div>
 
@@ -430,33 +347,26 @@ const itemsPerPage = ref(10)
 const activeTab = ref('news')
 const currentTime = ref(new Date())
 const hasSearched = ref(false)
-const categoryError = ref('')
 let timerInterval = null
 
 // Filters
 const filters = reactive({
   category: '',
   last_updated: '',
-  market: '',
-  impact: '',
-  country: '',
-  keyword: '',
-  source: ''
+  source: '',
+  keyword: ''
+})
+
+// Available sources (computed from data)
+const sources = computed(() => {
+  const srcs = new Set(allNews.value.map(item => item.source).filter(Boolean))
+  return Array.from(srcs).sort()
 })
 
 // ============== VALIDATION ==============
 const isSearchValid = computed(() => {
-  return filters.category && filters.category.trim() !== ''
+  return filters.category || (filters.keyword && filters.keyword.trim() !== '')
 })
-
-const validateCategory = () => {
-  if (!filters.category) {
-    categoryError.value = 'Category is required'
-    return false
-  }
-  categoryError.value = ''
-  return true
-}
 
 // ============== CACHE MANAGEMENT ==============
 const saveNewsToCache = (data) => {
@@ -466,10 +376,8 @@ const saveNewsToCache = (data) => {
       filters: {
         category: filters.category,
         last_updated: filters.last_updated,
-        market: filters.market,
-        impact: filters.impact,
-        keyword: filters.keyword,
-        source: filters.source
+        source: filters.source,
+        keyword: filters.keyword
       }
     }
     saveCacheData(NEWS_CACHE_KEY, JSON.stringify(cacheData), 5)
@@ -490,10 +398,8 @@ const loadNewsFromCache = () => {
       // Check if filters match
       if (cacheData.filters.category === filters.category &&
           cacheData.filters.last_updated === filters.last_updated &&
-          cacheData.filters.market === filters.market &&
-          cacheData.filters.impact === filters.impact &&
-          cacheData.filters.keyword === filters.keyword &&
-          cacheData.filters.source === filters.source) {
+          cacheData.filters.source === filters.source &&
+          cacheData.filters.keyword === filters.keyword) {
         
         allNews.value = cacheData.data
         console.log('✅ News loaded from cache')
@@ -511,8 +417,6 @@ const saveEventsToCache = (data) => {
     const cacheData = {
       data: data,
       filters: {
-        impact: filters.impact,
-        country: filters.country,
         keyword: filters.keyword
       }
     }
@@ -533,10 +437,7 @@ const loadEventsFromCache = () => {
       const cacheData = JSON.parse(cached)
       
       // Check if filters match
-      if (cacheData.filters.impact === filters.impact &&
-          cacheData.filters.country === filters.country &&
-          cacheData.filters.keyword === filters.keyword) {
-        
+      if (cacheData.filters.keyword === filters.keyword) {
         events.value = cacheData.data
         console.log('✅ Events loaded from cache')
         return true
@@ -566,51 +467,17 @@ onUnmounted(() => {
   }
 })
 
-// Available filter options (computed from data)
-const categories = computed(() => {
-  const cats = new Set(allNews.value.map(n => n.category).filter(Boolean))
-  return Array.from(cats).sort()
-})
-
-const markets = computed(() => {
-  const mkts = new Set()
-  allNews.value.forEach(news => {
-    news.market_tags?.forEach(tag => mkts.add(tag))
-  })
-  return Array.from(mkts).sort()
-})
-
-const sources = computed(() => {
-  const srcs = new Set(allNews.value.map(n => n.source).filter(Boolean))
-  return Array.from(srcs).sort()
-})
-
-const countries = computed(() => {
-  const cntrs = new Set(events.value.map(e => e.country).filter(Boolean))
-  return Array.from(cntrs).sort()
-})
-
-// Filtered news
+// Filtered news (client-side filtering)
 const filteredNews = computed(() => {
-  return allNews.value.filter(news => {
-    // Category filter (already applied in search)
-    if (filters.category && news.category !== filters.category) return false
-    
-    // Market filter
-    if (filters.market && (!news.market_tags || !news.market_tags.includes(filters.market))) return false
-    
-    // Impact filter
-    if (filters.impact && news.impact !== filters.impact) return false
-    
+  return allNews.value.filter(item => {
     // Source filter
-    if (filters.source && news.source !== filters.source) return false
+    if (filters.source && item.source !== filters.source) return false
     
-    // Keyword search
-    if (filters.keyword) {
+    // Keyword search (if keyword exists and we're not using it as category)
+    if (filters.keyword && filters.category) {
       const keyword = filters.keyword.toLowerCase()
-      const titleMatch = news.title?.toLowerCase().includes(keyword)
-      const descMatch = news.description?.toLowerCase().includes(keyword)
-      if (!titleMatch && !descMatch) return false
+      const titleMatch = item.title?.toLowerCase().includes(keyword)
+      if (!titleMatch) return false
     }
     
     return true
@@ -620,12 +487,6 @@ const filteredNews = computed(() => {
 // Filtered events
 const filteredEvents = computed(() => {
   return events.value.filter(event => {
-    // Impact filter
-    if (filters.impact && event.impact !== filters.impact) return false
-    
-    // Country filter
-    if (filters.country && event.country !== filters.country) return false
-    
     // Keyword search
     if (filters.keyword) {
       const keyword = filters.keyword.toLowerCase()
@@ -752,18 +613,15 @@ const highImpactEvents = computed(() =>
 const hasActiveFilters = computed(() => {
   return filters.category || 
          filters.last_updated ||
-         filters.market || 
-         filters.impact || 
-         filters.country ||
-         filters.keyword || 
-         filters.source
+         filters.source ||
+         filters.keyword
 })
 
 // ============== SEARCH FUNCTION ==============
 const handleSearch = async () => {
-  // Validate category
-  if (!validateCategory()) {
-    notification.error('Please select a category')
+  // Validate that either category or keyword is provided
+  if (!filters.category && !filters.keyword) {
+    notification.error('Please select a category or enter a keyword')
     return
   }
 
@@ -781,27 +639,6 @@ const handleSearch = async () => {
 }
 
 // Helper functions
-const formatTimeAgo = (dateString) => {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now - date
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
-
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-  
-  return date.toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
 const formatEventDate = (dateStr) => {
   const today = new Date()
   const tomorrow = new Date(today)
@@ -838,38 +675,22 @@ const formatEventTime = (dateTime) => {
   return `${hour12}:${minutes} ${ampm}`
 }
 
-const truncateDescription = (html, maxLength = 150) => {
-  if (!html) return ''
-  const text = html.replace(/<[^>]*>/g, '')
-  if (text.length <= maxLength) return text
-  return text.substring(0, maxLength) + '...'
-}
-
-const getImpactClass = (impact) => {
-  return impact?.toLowerCase() || ''
-}
-
 const getEventImpactClass = (impact) => {
   if (!impact) return ''
   return impact.toLowerCase()
 }
 
-const getSourceClass = (source) => {
-  return source?.toLowerCase().replace(/\s+/g, '-') || ''
+// Apply filters and reset page
+const applyFilters = () => {
+  currentPage.value = 1
 }
 
-// Debounce function
 const debounce = (fn, delay) => {
   let timeoutId
   return (...args) => {
     clearTimeout(timeoutId)
     timeoutId = setTimeout(() => fn(...args), delay)
   }
-}
-
-// Apply filters and reset page
-const applyFilters = () => {
-  currentPage.value = 1
 }
 
 const debouncedApplyFilters = debounce(applyFilters, 500)
@@ -882,12 +703,8 @@ const clearKeyword = () => {
 const resetFilters = () => {
   filters.category = ''
   filters.last_updated = ''
-  filters.market = ''
-  filters.impact = ''
-  filters.country = ''
-  filters.keyword = ''
   filters.source = ''
-  categoryError.value = ''
+  filters.keyword = ''
   hasSearched.value = false
   allNews.value = []
   applyFilters()
@@ -903,7 +720,7 @@ const getAuthToken = () => {
   return authToken
 }
 
-// Fetch news
+// Fetch news using new API
 const fetchNews = async (forceRefresh = false) => {
   newsLoading.value = true
   error.value = null
@@ -911,32 +728,36 @@ const fetchNews = async (forceRefresh = false) => {
   try {
     const token = getAuthToken()
     
-    // Build query parameters
-    const params = new URLSearchParams()
-    if (filters.category) params.append('category', filters.category)
-    if (filters.last_updated) params.append('last_updated', filters.last_updated)
-    if (filters.market) params.append('market', filters.market)
-    if (filters.impact) params.append('impact', filters.impact)
-    if (filters.keyword) params.append('keyword', filters.keyword)
+    // Determine what to use as category
+    // If category is selected, use that
+    // Otherwise, use the keyword as the category
+    const searchCategory = filters.category || filters.keyword
     
-    const url = `${API_BASE_URL}/insight${params.toString() ? '?' + params.toString() : ''}`
+    const payload = {
+      category: searchCategory
+    }
     
-    console.log('🔍 Searching news with URL:', url)
+    if (filters.last_updated) {
+      payload.last_updated = filters.last_updated
+    }
     
-    const response = await fetch(url, {
-      method: 'GET',
+    console.log('🔍 Searching news with payload:', payload)
+    
+    const response = await fetch(`${API_BASE_URL}/insight/news`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
-      }
+      },
+      body: JSON.stringify(payload)
     })
     
     const data = await response.json()
     
     if (data.code === '200') {
-      allNews.value = data.data || []
+      allNews.value = data.data.data || []
       saveNewsToCache(allNews.value)
-      notification.success(`Found ${allNews.value.length} news articles`)
+      notification.success(`Found ${allNews.value.length} news articles for: ${searchCategory}`)
     } else {
       throw new Error(data.message || 'Failed to fetch news')
     }
@@ -990,10 +811,11 @@ const fetchEvents = async (forceRefresh = false) => {
 }
 
 // Watch for filter changes (only for UI updates, not API calls)
-watch([() => filters.market, () => filters.impact, () => filters.country, () => filters.source], () => {
+watch([() => filters.source, () => filters.keyword], () => {
   applyFilters()
 })
 </script>
+
 <style scoped>
   @import '../assets/styles/insight.css';
 </style>
