@@ -349,51 +349,75 @@
 
     <!-- Merge Transactions Modal -->
     <div v-if="showMergeModal" class="modal-overlay" @click="closeMergeModal">
-      <div class="modal-content" @click.stop>
-        <div class="modal-header">
-          <h2>Merge Transactions</h2>
-          <button class="close-btn" @click="closeMergeModal">✕</button>
-        </div>
+  <div class="modal-content" @click.stop>
+    <div class="modal-header">
+      <h2>Merge Transactions</h2>
+      <button class="close-btn" @click="closeMergeModal">✕</button>
+    </div>
 
-        <div class="modal-body">
-          <p class="merge-description">
-            This will merge all transactions from the selected date into a single consolidated transaction.
-          </p>
+    <div class="modal-body">
+      <div class="info-box">
+        <span class="info-icon">🔄</span>
+        <span class="info-text">This will merge all transactions from the selected date into a single consolidated transaction.</span>
+      </div>
 
-          <div class="form-group">
-            <label for="merge-date">Select Date *</label>
-            <input type="date" id="merge-date" v-model="mergeDate" class="form-input" />
-            <small class="hint">All transactions on this date will be merged</small>
-          </div>
+      <div class="form-group">
+        <label for="merge-date">Select Date <span class="required-star">*</span></label>
+        <input 
+          type="date" 
+          id="merge-date" 
+          v-model="mergeDate" 
+          class="form-input" 
+          placeholder="dd/mm/yyyy"
+        />
+        <small class="hint">All transactions on this date will be merged</small>
+      </div>
 
-          <div v-if="selectedDateTransactions.length > 0" class="preview-section">
-            <h4>Transactions to be merged:</h4>
-            <div class="preview-list">
-              <div v-for="tx in selectedDateTransactions" :key="tx.sn" class="preview-item">
-                <span class="preview-symbol">{{ tx.symbol || '-' }}</span>
-                <span class="preview-type" :class="tx.type.toLowerCase()">{{ tx.type }}</span>
-                <span class="preview-amount" :class="getAmountClass(tx)">
-                  {{ formatTransactionAmount(tx) }} {{ tx.currency }}
-                </span>
-              </div>
+      <div v-if="selectedDateTransactions.length > 0" class="preview-section">
+        <h4>Transactions to be merged:</h4>
+        <div class="preview-list">
+          <div v-for="tx in selectedDateTransactions" :key="tx.sn" class="preview-item">
+            <div class="preview-item-left">
+              <span class="preview-type-badge" :class="tx.type.toLowerCase()">{{ tx.type }}</span>
+              <span class="preview-symbol">{{ tx.symbol || '-' }}</span>
             </div>
-            <div class="preview-total">
-              <strong>Total: {{ selectedDateTransactions.length }} transactions</strong>
+            <div class="preview-item-right">
+              <span class="preview-amount" :class="getAmountClass(tx)">
+                {{ formatTransactionAmount(tx) }}
+              </span>
+              <span class="preview-currency">{{ tx.currency }}</span>
             </div>
           </div>
         </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="closeMergeModal" :disabled="merging">
-            Cancel
-          </button>
-          <button type="button" class="btn btn-merge" @click="handleMerge" :disabled="!mergeDate || merging">
-            <span v-if="merging" class="spinner-small"></span>
-            {{ merging ? 'Merging...' : 'Merge Transactions' }}
-          </button>
+        <div class="preview-total">
+          <span class="total-label">Total Transactions:</span>
+          <span class="total-value">{{ selectedDateTransactions.length }}</span>
         </div>
       </div>
+
+      <div v-else-if="mergeDate" class="no-transactions-message">
+        <span class="message-icon">📭</span>
+        <span>No transactions found for this date</span>
+      </div>
     </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" @click="closeMergeModal" :disabled="merging">
+        Cancel
+      </button>
+      <button 
+        type="button" 
+        class="btn btn-merge-modal" 
+        @click="handleMerge" 
+        :disabled="!mergeDate || selectedDateTransactions.length === 0 || merging"
+      >
+        <span v-if="merging" class="spinner-small"></span>
+        <span class="btn-icon" v-else>🔄</span>
+        {{ merging ? 'Merging...' : 'Merge Transactions' }}
+      </button>
+    </div>
+  </div>
+</div>
 
     <!-- Delete Confirmation Modal -->
     <div v-if="showDeleteModal" class="modal-overlay" @click="closeDeleteModal">
@@ -1169,8 +1193,7 @@ const handleDelete = async () => {
 }
 </script>
 
-<style scoped>
-.radio-label.deposit {
+<style scoped>.radio-label.deposit {
   background: #dbeafe;
   color: #1e40af;
 }
@@ -1434,110 +1457,6 @@ const handleDelete = async () => {
 .btn-merge:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.merge-description {
-  color: #6b7280;
-  font-size: 12px;
-  margin-bottom: 16px;
-  padding: 8px 12px;
-  background: #f3f4f6;
-  border-radius: 6px;
-}
-
-.preview-section {
-  margin-top: 20px;
-  border-top: 1px solid #e5e7eb;
-  padding-top: 16px;
-}
-
-.preview-section h4 {
-  margin: 0 0 12px 0;
-  font-size: 13px;
-  color: #374151;
-}
-
-.preview-list {
-  max-height: 200px;
-  overflow-y: auto;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  margin-bottom: 12px;
-}
-
-.preview-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #f3f4f6;
-  font-size: 11px;
-}
-
-.preview-item:last-child {
-  border-bottom: none;
-}
-
-.preview-symbol {
-  font-weight: 600;
-  min-width: 50px;
-}
-
-.preview-type {
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-  font-weight: 500;
-  min-width: 70px;
-  text-align: center;
-}
-
-.preview-type.profit {
-  background: #d1fae5;
-  color: #059669;
-}
-
-.preview-type.loss {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.preview-type.deposit {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.preview-type.withdrawal {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.preview-amount {
-  flex: 1;
-  text-align: right;
-  font-weight: 500;
-}
-
-.preview-total {
-  text-align: right;
-  font-size: 12px;
-  color: #6b7280;
-  padding: 8px 12px;
-  background: #f9fafb;
-  border-radius: 6px;
-}
-
-.dark .preview-section h4 {
-  color: #e5e7eb;
-}
-
-.dark .preview-item {
-  border-bottom-color: #374151;
-}
-
-.dark .preview-total {
-  background: #374151;
-  color: #9ca3af;
 }
 
 /* Filter Bar */
@@ -2239,6 +2158,318 @@ const handleDelete = async () => {
   margin: 10px;
 }
 
+/* Merge Modal Specific Styles */
+.info-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  margin: 0 20px 20px 20px;
+}
+
+.dark .info-box {
+  background: #1e3a8a20;
+  border-color: #3b82f6;
+}
+
+.info-icon {
+  font-size: 20px;
+  color: #3b82f6;
+}
+
+.info-text {
+  font-size: 12px;
+  color: #0369a1;
+  line-height: 1.5;
+}
+
+.dark .info-text {
+  color: #93c5fd;
+}
+
+.required-star {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+.modal-body {
+  padding: 0 20px;
+}
+
+.preview-section {
+  margin-top: 20px;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.dark .preview-section {
+  background: #2d3748;
+  border-color: #4b5563;
+}
+
+.preview-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.dark .preview-section h4 {
+  color: #e5e7eb;
+}
+
+.preview-list {
+  max-height: 250px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  border-radius: 6px;
+  background: white;
+  border: 1px solid #e5e7eb;
+}
+
+.dark .preview-list {
+  background: #1f2937;
+  border-color: #4b5563;
+}
+
+.preview-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.2s;
+}
+
+.preview-item:hover {
+  background: #f9fafb;
+}
+
+.dark .preview-item:hover {
+  background: #2d3748;
+}
+
+.preview-item:last-child {
+  border-bottom: none;
+}
+
+.preview-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.preview-type-badge {
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  min-width: 70px;
+  text-align: center;
+}
+
+.preview-type-badge.profit {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.preview-type-badge.loss {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.preview-type-badge.deposit {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.preview-type-badge.withdrawal {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dark .preview-type-badge.profit {
+  background: #064e3b;
+  color: #a7f3d0;
+}
+
+.dark .preview-type-badge.loss {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
+.dark .preview-type-badge.deposit {
+  background: #1e3a8a;
+  color: #93c5fd;
+}
+
+.dark .preview-type-badge.withdrawal {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+.preview-symbol {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.dark .preview-symbol {
+  color: #9ca3af;
+}
+
+.preview-item-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preview-amount {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.preview-amount.profit {
+  color: #10b981;
+}
+
+.preview-amount.loss {
+  color: #ef4444;
+}
+
+.preview-currency {
+  font-size: 10px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.dark .preview-currency {
+  background: #4b5563;
+  color: #9ca3af;
+}
+
+.preview-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  font-size: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.dark .preview-total {
+  background: #374151;
+  border-color: #4b5563;
+}
+
+.total-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.dark .total-label {
+  color: #9ca3af;
+}
+
+.total-value {
+  font-weight: 600;
+  color: #3b82f6;
+  background: white;
+  padding: 2px 10px;
+  border-radius: 16px;
+  font-size: 12px;
+}
+
+.dark .total-value {
+  background: #1f2937;
+  color: #60a5fa;
+}
+
+.no-transactions-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  background: #f9fafb;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 12px;
+  margin: 20px 0;
+  border: 1px dashed #e5e7eb;
+}
+
+.dark .no-transactions-message {
+  background: #2d3748;
+  color: #9ca3af;
+  border-color: #4b5563;
+}
+
+.message-icon {
+  font-size: 18px;
+}
+
+/* Updated Modal Footer */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+  border-radius: 0 0 10px 10px;
+  margin-top: 20px;
+}
+
+.dark .modal-footer {
+  border-top-color: #374151;
+  background: #111827;
+}
+
+.btn-merge-modal {
+  background: #8b5cf6;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.btn-merge-modal:hover:not(:disabled) {
+  background: #7c3aed;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.2);
+}
+
+.btn-merge-modal:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dark .btn-merge-modal {
+  background: #7c3aed;
+}
+
+.dark .btn-merge-modal:hover:not(:disabled) {
+  background: #6d28d9;
+}
+
 /* Delete Modal */
 .confirm-delete {
   max-width: 400px;
@@ -2367,10 +2598,6 @@ const handleDelete = async () => {
   color: #6b7280;
 }
 
-.modal-footer {
-  padding: 18px;
-}
-
 /* Responsive */
 @media (max-width: 768px) {
   .action-bar {
@@ -2406,6 +2633,36 @@ const handleDelete = async () => {
   .radio-group {
     flex-direction: column;
     gap: 8px;
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+  }
+  
+  .modal-footer .btn,
+  .modal-footer .btn-merge-modal {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .info-box {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .preview-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .preview-item-left {
+    width: 100%;
+  }
+  
+  .preview-item-right {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 
@@ -2450,7 +2707,8 @@ const handleDelete = async () => {
   .filter-input,
   .filter-select,
   .pagination-btn,
-  .action-btn {
+  .action-btn,
+  .btn-merge-modal {
     padding: 12px;
     font-size: 14px;
   }
@@ -2480,6 +2738,11 @@ const handleDelete = async () => {
 }
 
 @media (max-width: 768px) {
+
+  .action-buttons-left {
+      margin: 0 20%;
+
+  }
   .mobile-only {
     display: block !important;
   }

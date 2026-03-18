@@ -420,8 +420,8 @@ const saveEventsToCache = (data) => {
         keyword: filters.keyword
       }
     }
-    saveCacheData(EVENTS_CACHE_KEY, JSON.stringify(cacheData), 5)
-    saveCacheData(EVENTS_TIMESTAMP_KEY, new Date().toISOString(), 5)
+    saveCacheData(EVENTS_CACHE_KEY, JSON.stringify(cacheData), 1440)
+    saveCacheData(EVENTS_TIMESTAMP_KEY, new Date().toISOString(), 30)
 
     console.log('✅ Events saved to cache')
   } catch (err) {
@@ -525,7 +525,7 @@ const getCountdown = (dateTime) => {
   
   // If event already passed
   if (eventDate < now) {
-    return 'Passed'
+    return 'Over'
   }
   
   const diffMs = eventDate - now
@@ -544,7 +544,7 @@ const getCountdown = (dateTime) => {
   }
 }
 
-// Group and sort events by date (ascending - tomorrow first)
+// Group and sort events by date (upcoming first, past last)
 const sortedEventGroupsAsc = computed(() => {
   // First, group events by date
   const groups = {}
@@ -566,12 +566,41 @@ const sortedEventGroupsAsc = computed(() => {
     })
   })
   
-  // Sort dates in ascending order (tomorrow first, then next days)
-  const sortedDates = Object.keys(groups).sort((a, b) => {
+  const now = currentTime.value
+  
+  // Separate upcoming and past dates
+  const upcomingDates = []
+  const pastDates = []
+  
+  Object.keys(groups).forEach(date => {
+    const eventDate = parseEventDate(date + ' 00:00:00')
+    const lastEventTime = parseEventDate(date + ' 23:59:59')
+    
+    if (lastEventTime < now) {
+      // All events on this date are in the past
+      pastDates.push(date)
+    } else {
+      // This date has upcoming events
+      upcomingDates.push(date)
+    }
+  })
+  
+  // Sort upcoming dates in ascending order (soonest first)
+  upcomingDates.sort((a, b) => {
     const dateA = parseEventDate(a + ' 00:00:00')
     const dateB = parseEventDate(b + ' 00:00:00')
-    return dateA - dateB // Ascending order (earlier dates first)
+    return dateA - dateB
   })
+  
+  // Sort past dates in descending order (most recent past first)
+  pastDates.sort((a, b) => {
+    const dateA = parseEventDate(a + ' 00:00:00')
+    const dateB = parseEventDate(b + ' 00:00:00')
+    return dateB - dateA
+  })
+  
+  // Combine: upcoming first, then past
+  const sortedDates = [...upcomingDates, ...pastDates]
   
   // Create new object with sorted dates
   const sortedGroups = {}
