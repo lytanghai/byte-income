@@ -125,59 +125,120 @@
       <button @click="fetchFromAPI(true)" class="btn-retry">Retry</button>
     </div>
 
-    <!-- Transactions Table -->
-    <div v-else-if="transactions.length > 0" class="table-container">
-      <div class="table-responsive">
-        <table class="transactions-table">
-          <thead>
-            <tr>
-              <th>Symbol</th>
-              <th>Type</th>
-              <th>Amount</th>
-              <th>Currency</th>
-              <th>Date</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="transaction in paginatedTransactions" :key="transaction.sn">
-              <td>
-                <span class="symbol-badge">{{ transaction.symbol || '-' }}</span>
-              </td>
-              <td>
-                <span class="type-badge" :class="transaction.type.toLowerCase()">
-                  {{ transaction.type }}
-                </span>
-              </td>
-              <td :class="getAmountClass(transaction)">
-                {{ formatTransactionAmount(transaction) }}
-              </td>
-              <td>{{ transaction.currency }} ({{ transaction.currency === 'USD' ? '$' : '¢' }})</td>
-              <td class="date-cell">{{ formatDate(transaction.date) }}</td>
-              <td class="actions-cell">
-                <button class="action-btn edit" @click="openEditModal(transaction)" title="Edit">
-                  ✏️
-                </button>
-                <button class="action-btn delete" @click="confirmDelete(transaction)" title="Delete">
-                  🗑️
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+    <!-- Transactions View -->
+    <div v-else-if="transactions.length > 0" class="transactions-container">
+      <!-- Desktop Table View -->
+      <div class="table-container desktop-only">
+        <div class="table-responsive">
+          <table class="transactions-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Currency</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="transaction in paginatedTransactions" :key="transaction.sn">
+                <td>
+                  <span class="symbol-badge">{{ transaction.symbol || '-' }}</span>
+                </td>
+                <td>
+                  <span class="type-badge" :class="transaction.type.toLowerCase()">
+                    {{ transaction.type }}
+                  </span>
+                </td>
+                <td :class="getAmountClass(transaction)">
+                  {{ formatTransactionAmount(transaction) }}
+                </td>
+                <td>{{ transaction.currency }} ({{ transaction.currency === 'USD' ? '$' : '¢' }})</td>
+                <td class="date-cell">{{ formatDate(transaction.date) }}</td>
+                <td class="actions-cell">
+                  <button class="action-btn edit" @click="openEditModal(transaction)" title="Edit">
+                    ✏️
+                  </button>
+                  <button class="action-btn delete" @click="confirmDelete(transaction)" title="Delete">
+                    🗑️
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination for Desktop -->
+        <div class="pagination">
+          <button @click="changePage(currentPage - 1)" :disabled="currentPage === 1" class="pagination-btn">
+            ← Previous
+          </button>
+          <span class="page-info">
+            Page {{ currentPage }} of {{ totalPages }}
+          </span>
+          <button @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages" class="pagination-btn">
+            Next →
+          </button>
+        </div>
       </div>
 
-      <!-- Pagination -->
-      <div class="pagination">
-        <button @click="changePage(currentPage - 1)" :disabled="currentPage === 1" class="pagination-btn">
-          ← Previous
-        </button>
-        <span class="page-info">
-          Page {{ currentPage }} of {{ totalPages }}
-        </span>
-        <button @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages" class="pagination-btn">
-          Next →
-        </button>
+      <!-- Mobile Bank Statement View -->
+      <div class="mobile-statement mobile-only">
+        <div v-for="(group, date) in groupedByDate" :key="date" class="date-group">
+          <div class="date-header">
+            <span class="date-label">{{ formatGroupDate(date) }}</span>
+          </div>
+          
+          <div class="transactions-list">
+            <div v-for="transaction in group" :key="transaction.sn" class="transaction-item">
+              <div class="transaction-row">
+                <div class="transaction-left">
+                  <span class="transaction-type" :class="transaction.type.toLowerCase()">
+                    {{ transaction.type }}
+                  </span>
+                  <span class="transaction-symbol">{{ transaction.symbol || '-' }}</span>
+                </div>
+                <div class="transaction-right">
+                  <span class="transaction-amount" :class="getAmountClass(transaction)">
+                    {{ formatAmountWithSign(transaction) }} {{ transaction.currency }}
+                    
+                  </span>
+                  <span class="transaction-currency">{{ convertDateToBankType(transaction.date.toString()) }} </span>
+                </div>
+              </div>
+              
+              <div class="transaction-actions">
+                <button class="action-btn edit small" @click="openEditModal(transaction)" title="Edit">
+                  ✏️
+                </button>
+                <button class="action-btn delete small" @click="confirmDelete(transaction)" title="Delete">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div v-if="group.length > 1" class="date-total">
+            <span class="total-label">Daily Total:</span>
+            <span class="total-amount" :class="getDailyTotalClass(group)">
+              {{ formatDailyTotal(group) }}
+            </span>
+          </div>
+          
+          <div class="date-divider"></div>
+        </div>
+        
+        <!-- Mobile Pagination -->
+        <div class="mobile-pagination">
+          <button @click="changePage(currentPage - 1)" :disabled="currentPage === 1" class="pagination-btn mobile">
+            ← Previous
+          </button>
+          <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
+          <button @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages" class="pagination-btn mobile">
+            Next →
+          </button>
+        </div>
       </div>
     </div>
 
@@ -481,6 +542,31 @@ const selectedDateTransactions = computed(() => {
   })
 })
 
+// Group transactions by date for mobile view
+const groupedByDate = computed(() => {
+  const groups = {}
+  
+  filteredTransactions.value.forEach(tx => {
+    const date = new Date(tx.date)
+    const dateKey = date.toDateString()
+    
+    if (!groups[dateKey]) {
+      groups[dateKey] = []
+    }
+    groups[dateKey].push(tx)
+  })
+  
+  // Sort dates in descending order (newest first)
+  const sortedGroups = {}
+  Object.keys(groups)
+    .sort((a, b) => new Date(b) - new Date(a))
+    .forEach(key => {
+      sortedGroups[key] = groups[key]
+    })
+  
+  return sortedGroups
+})
+
 // Handle type change
 const handleTypeChange = () => {
   if (!isTradingType.value) {
@@ -690,6 +776,22 @@ const createTransaction = async () => {
   }
 }
 
+const convertDateToBankType = (input) => {
+  const date = new Date(input);
+
+  const formatted = date.toLocaleString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  });
+
+  // remove the extra comma after year
+  return formatted.replace(",", "");
+};
 const updateTransaction = async () => {
   try {
     const token = getAuthToken()
@@ -884,6 +986,46 @@ const formatTransactionAmount = (transaction) => {
   return `${amount}`
 }
 
+const formatAmountWithSign = (transaction) => {
+  if (!transaction) return '-'
+  const amount = transaction.pnl || 0
+  const sign = transaction.type === 'PROFIT' || transaction.type === 'DEPOSIT' ? '+' : 
+               transaction.type === 'LOSS' || transaction.type === 'WITHDRAWAL' ? '-' : ''
+  return `${sign}${Math.abs(amount).toFixed(2)}`
+}
+
+const formatDailyTotal = (transactions) => {
+  const total = calculateTradingPnL(transactions)
+  const sign = total > 0 ? '+' : total < 0 ? '-' : ''
+  return `${sign}${Math.abs(total).toFixed(2)} USDC`
+}
+
+const convertToUSDC = (amount, currency) => {
+  if (currency === 'USD') return amount * 100
+  if (currency === 'USDC') return amount
+  return 0 // or throw / handle other currencies later
+}
+const calculateTradingPnL = (transactions) => {
+  return transactions.reduce((sum, t) => {
+    const value = convertToUSDC(t.pnl, t.currency)
+
+    if (t.type === 'PROFIT') return sum + value
+    if (t.type === 'LOSS') return sum - value
+    return sum
+  }, 0)
+}
+const getDailyTotalClass = (transactions) => {
+  const total = transactions.reduce((sum, t) => {
+    if (t.type === 'PROFIT') return sum + t.pnl
+    if (t.type === 'LOSS') return sum - t.pnl
+    return sum // ignore DEPOSIT & WITHDRAWAL
+  }, 0)
+  
+  if (total > 0) return 'profit'
+  if (total < 0) return 'loss'
+  return ''
+}
+
 const getAmountClass = (transaction) => {
   if (!transaction) return ''
   if (transaction.type === 'PROFIT' || transaction.type === 'DEPOSIT') return 'profit'
@@ -900,6 +1042,25 @@ const formatDate = (dateString) => {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+const formatGroupDate = (dateKey) => {
+  const date = new Date(dateKey)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  
+  if (date.toDateString() === today.toDateString()) {
+    return 'Today'
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return 'Yesterday'
+  } else {
+    return date.toLocaleDateString('en-US', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    })
+  }
 }
 
 const formatTimeAgo = (timestamp) => {
@@ -1009,8 +1170,1322 @@ const handleDelete = async () => {
 </script>
 
 <style scoped>
-@import '../assets/styles/transaction.css';
+.radio-label.deposit {
+  background: #dbeafe;
+  color: #1e40af;
+}
 
-/* Additional styles for merge functionality */
+.radio-label.withdrawal {
+  background: #fef3c7;
+  color: #92400e;
+}
 
+.dark .radio-label.deposit {
+  background: #1e3a8a;
+  color: #93c5fd;
+}
+
+.dark .radio-label.withdrawal {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+/* Type badge styles for deposit/withdrawal */
+.type-badge.deposit {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.type-badge.withdrawal {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dark .type-badge.deposit {
+  background: #1e3a8a;
+  color: #93c5fd;
+}
+
+.dark .type-badge.withdrawal {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+.transaction-page {
+  padding: clamp(12px, 2.25vw, 18px);
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.page-header {
+  margin-bottom: 18px;
+}
+
+.page-header h1 {
+  margin: 0 0 6px 0;
+  color: var(--text-main);
+  font-size: clamp(18px, 3vw, 24px);
+}
+
+.page-header .subtitle {
+  margin: 0;
+  color: #6b7280;
+  font-size: 10.5px;
+}
+
+.dark .page-header .subtitle {
+  color: #9ca3af;
+}
+
+/* Action Bar */
+.action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.action-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cache-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.cache-status.cached {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.cache-status.stale {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.cache-status.fresh {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.cache-status.cached .status-dot {
+  background: #059669;
+}
+
+.cache-status.stale .status-dot {
+  background: #d97706;
+}
+
+.cache-status.fresh .status-dot {
+  background: #2563eb;
+}
+
+.cache-time {
+  font-size: 9px;
+  opacity: 0.8;
+}
+
+.last-updated {
+  font-size: 9px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.dark .last-updated {
+  background: #374151;
+  color: #9ca3af;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #d1d5db;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.btn-refresh {
+  background: #10b981;
+  color: white;
+  min-width: 90px;
+}
+
+.btn-refresh:hover:not(:disabled) {
+  background: #059669;
+}
+
+.btn-refresh:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.btn-refresh.refreshing {
+  background: #6b7280;
+}
+
+.refresh-icon {
+  display: inline-block;
+  font-size: 14px;
+  transition: transform 0.3s ease;
+}
+
+.refresh-icon.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.action-buttons-left {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btn-merge {
+  background: #8b5cf6;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.btn-merge:hover:not(:disabled) {
+  background: #7c3aed;
+}
+
+.btn-merge:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.merge-description {
+  color: #6b7280;
+  font-size: 12px;
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  background: #f3f4f6;
+  border-radius: 6px;
+}
+
+.preview-section {
+  margin-top: 20px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 16px;
+}
+
+.preview-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: #374151;
+}
+
+.preview-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.preview-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 11px;
+}
+
+.preview-item:last-child {
+  border-bottom: none;
+}
+
+.preview-symbol {
+  font-weight: 600;
+  min-width: 50px;
+}
+
+.preview-type {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  min-width: 70px;
+  text-align: center;
+}
+
+.preview-type.profit {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.preview-type.loss {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.preview-type.deposit {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.preview-type.withdrawal {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.preview-amount {
+  flex: 1;
+  text-align: right;
+  font-weight: 500;
+}
+
+.preview-total {
+  text-align: right;
+  font-size: 12px;
+  color: #6b7280;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+}
+
+.dark .preview-section h4 {
+  color: #e5e7eb;
+}
+
+.dark .preview-item {
+  border-bottom-color: #374151;
+}
+
+.dark .preview-total {
+  background: #374151;
+  color: #9ca3af;
+}
+
+/* Filter Bar */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dark .filter-bar {
+  background: #1f2937;
+}
+
+.filter-group {
+  flex: 1;
+  min-width: 140px;
+}
+
+.filter-input,
+.filter-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 10px;
+  background: white;
+  color: #1f2937;
+}
+
+.dark .filter-input,
+.dark .filter-select {
+  background: #374151;
+  border-color: #4b5563;
+  color: white;
+}
+
+/* Summary Cards */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.summary-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dark .summary-card {
+  background: #1f2937;
+}
+
+.card-icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border-radius: 8px;
+  font-size: 18px;
+}
+
+.dark .card-icon {
+  background: #374151;
+}
+
+.card-icon.profit {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.card-icon.loss {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.card-label {
+  font-size: 9px;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.card-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.dark .card-value {
+  color: white;
+}
+
+/* Desktop Table */
+.table-container {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dark .table-container {
+  background: #1f2937;
+}
+
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 16px;
+}
+
+.transactions-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px;
+  font-size: 10px;
+}
+
+.transactions-table th {
+  background: #f9fafb;
+  padding: 10px;
+  text-align: left;
+  font-weight: 500;
+  color: #6b7280;
+  border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.dark .transactions-table th {
+  background: #111827;
+  color: #9ca3af;
+  border-bottom-color: #374151;
+}
+
+.transactions-table td {
+  padding: 10px;
+  border-bottom: 1px solid #e5e7eb;
+  color: #1f2937;
+}
+
+.dark .transactions-table td {
+  border-bottom-color: #374151;
+  color: #e5e7eb;
+}
+
+.transactions-table tr:hover {
+  background: #f9fafb;
+}
+
+.dark .transactions-table tr:hover {
+  background: #111827;
+}
+
+.symbol-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  background: #f3f4f6;
+  border-radius: 12px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.dark .symbol-badge {
+  background: #374151;
+  color: #e5e7eb;
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.type-badge.profit {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.type-badge.loss {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.dark .type-badge.profit {
+  background: #064e3b;
+  color: #a7f3d0;
+}
+
+.dark .type-badge.loss {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
+.date-cell {
+  white-space: nowrap;
+  font-size: 9px;
+  color: #6b7280;
+}
+
+.actions-cell {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.action-btn {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.action-btn.edit {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.action-btn.edit:hover {
+  background: #bfdbfe;
+}
+
+.action-btn.delete {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.action-btn.delete:hover {
+  background: #fecaca;
+}
+
+.dark .action-btn.edit {
+  background: #1e3a8a;
+  color: #93c5fd;
+}
+
+.dark .action-btn.delete {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
+/* Mobile Statement View */
+.mobile-statement {
+  padding: 0 4px;
+}
+
+.date-group {
+  margin-bottom: 20px;
+}
+
+.date-header {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: #f3f4f6;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 12px;
+  color: #374151;
+  border-left: 4px solid #3b82f6;
+}
+
+.dark .date-header {
+  background: #2d3748;
+  color: #e5e7eb;
+  border-left-color: #60a5fa;
+}
+
+.transactions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.transaction-item {
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  border: 1px solid #f3f4f6;
+}
+
+.dark .transaction-item {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+.transaction-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.transaction-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.transaction-type {
+  padding: 4px 8px;
+  border-radius: 16px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.transaction-type.profit {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.transaction-type.loss {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.transaction-type.deposit {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.transaction-type.withdrawal {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.dark .transaction-type.profit {
+  background: #064e3b;
+  color: #a7f3d0;
+}
+
+.dark .transaction-type.loss {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
+.dark .transaction-type.deposit {
+  background: #1e3a8a;
+  color: #93c5fd;
+}
+
+.dark .transaction-type.withdrawal {
+  background: #78350f;
+  color: #fcd34d;
+}
+
+.transaction-symbol {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.dark .transaction-symbol {
+  color: #9ca3af;
+}
+
+.transaction-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.transaction-amount {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.transaction-amount.profit {
+  color: #10b981;
+}
+
+.transaction-amount.loss {
+  color: #ef4444;
+}
+
+.transaction-currency {
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.transaction-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.dark .transaction-actions {
+  border-top-color: #374151;
+}
+
+.action-btn.small {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.date-total {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.dark .date-total {
+  background: #2d3748;
+}
+
+.total-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.total-amount {
+  font-weight: 600;
+}
+
+.total-amount.profit {
+  color: #10b981;
+}
+
+.total-amount.loss {
+  color: #ef4444;
+}
+
+.date-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+  margin: 16px 0;
+}
+
+.dark .date-divider {
+  background: linear-gradient(90deg, transparent, #4b5563, transparent);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.dark .pagination {
+  border-top-color: #374151;
+}
+
+.pagination-btn {
+  padding: 6px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 0.2s;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dark .pagination-btn {
+  background: #374151;
+  border-color: #4b5563;
+  color: white;
+}
+
+.dark .pagination-btn:hover:not(:disabled) {
+  background: #4b5563;
+}
+
+.page-info {
+  font-size: 10px;
+  color: #6b7280;
+}
+
+.mobile-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 12px 0;
+}
+
+.pagination-btn.mobile {
+  flex: 1;
+  padding: 10px;
+  font-size: 12px;
+}
+
+/* Profit/Loss Colors */
+.profit {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.loss {
+  color: #ef4444;
+  font-weight: 500;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.dark .modal-content {
+  background: #1f2937;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  background: inherit;
+  border-radius: 10px 10px 0 0;
+}
+
+.dark .modal-header {
+  border-bottom-color: #374151;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 15px;
+  color: #1f2937;
+}
+
+.dark .modal-header h2 {
+  color: white;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 4px;
+}
+
+.close-btn:hover {
+  color: #374151;
+}
+
+.modal-form {
+  padding: 20px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.dark .form-group label {
+  color: #e5e7eb;
+}
+
+.form-input,
+.form-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 11px;
+  background: white;
+  color: #1f2937;
+}
+
+.dark .form-input,
+.dark .form-select {
+  background: #374151;
+  border-color: #4b5563;
+  color: white;
+}
+
+.form-input:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.radio-group {
+  display: flex;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.radio-option input[type="radio"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.radio-label {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 16px;
+}
+
+.radio-label.profit {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.radio-label.loss {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 9px;
+  color: #6b7280;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 10px;
+}
+
+/* Delete Modal */
+.confirm-delete {
+  max-width: 400px;
+}
+
+.delete-content {
+  padding: 24px 20px;
+  text-align: center;
+}
+
+.delete-icon {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.delete-message {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #374151;
+}
+
+.dark .delete-message {
+  color: #e5e7eb;
+}
+
+.warning {
+  color: #ef4444;
+  font-size: 10px;
+  margin: 0;
+}
+
+/* Loading States */
+.loading-state {
+  text-align: center;
+  padding: 48px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dark .loading-state {
+  background: #1f2937;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto 12px;
+  border: 3px solid #f3f4f6;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-small {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* Error State */
+.error-state {
+  text-align: center;
+  padding: 48px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dark .error-state {
+  background: #1f2937;
+}
+
+.error-message {
+  color: #ef4444;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.btn-retry {
+  padding: 8px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+/* No Data State */
+.no-data {
+  text-align: center;
+  padding: 60px 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.dark .no-data {
+  background: #1f2937;
+}
+
+.no-data-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.no-data h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: #1f2937;
+}
+
+.dark .no-data h3 {
+  color: white;
+}
+
+.no-data p {
+  margin: 0 0 16px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.modal-footer {
+  padding: 18px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .action-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .action-group {
+    justify-content: space-between;
+  }
+  
+  .filter-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .filter-group {
+    width: 100%;
+  }
+  
+  .summary-cards {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .form-actions .btn {
+    width: 100%;
+  }
+  
+  .radio-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .action-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .last-updated {
+    text-align: center;
+  }
+  
+  .btn-refresh {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .transaction-left {
+    width: 100%;
+  }
+  
+  .transaction-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .transaction-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* Touch Improvements */
+@media (hover: none) and (pointer: coarse) {
+  .btn,
+  .filter-input,
+  .filter-select,
+  .pagination-btn,
+  .action-btn {
+    padding: 12px;
+    font-size: 14px;
+  }
+  
+  .action-btn {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .action-btn.small {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .transaction-item {
+    padding: 16px;
+  }
+}
+
+/* Responsive utilities */
+.mobile-only {
+  display: none !important;
+}
+
+.desktop-only {
+  display: block !important;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block !important;
+  }
+  
+  .desktop-only {
+    display: none !important;
+  }
+}
 </style>
