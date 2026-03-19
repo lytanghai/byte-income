@@ -34,6 +34,10 @@
                         <!-- <span class="menu-icon">📄</span> -->
                         <span class="menu-text">Report</span>
                     </RouterLink>
+                    <RouterLink @click="closeSidebar" to="/calculator">
+                        <!-- <span class="menu-icon">📄</span> -->
+                        <span class="menu-text">Calculator</span>
+                    </RouterLink>
                     
                     <div class="menu-group">
                         <div class="menu-parent" @click="toggleSetting">
