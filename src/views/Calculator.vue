@@ -1,272 +1,316 @@
 <template>
   <div class="gold-calculator">
-    <h2>Gold Trading Portfolio Calculator</h2>
+    <header class="calculator-header">
+      <div class="header-top">
+        <h2>📊 Gold Trading Portfolio Calculator</h2>
+        <div class="connection-status" :class="connectionState">
+          <span class="status-dot"></span>
+          <span class="status-text">{{ connectionMessage }}</span>
+          <span class="last-update" v-if="lastUpdateTime">🕒 {{ lastUpdateTime }}</span>
+        </div>
+      </div>
+      <div class="cache-status" v-if="cacheLoaded">
+        <span class="cache-badge">📦 Loaded from cache</span>
+      </div>
+      <div class="cache-info" v-if="lastCacheTime">
+        <span class="cache-time">Last saved: {{ lastCacheTime }} ({{ cachedRowCount }} rows)</span>
+      </div>
+    </header>
     
     <div class="calculator-grid">
       <!-- Input Section -->
-      <div class="input-section">
-        <h3>Account Overview</h3>
-        
-        <div class="input-group">
-          <label>
-            <span class="label-icon">💰</span>
-            Current Gold Price (USD)
-          </label>
-          <input 
-            type="number" 
-            v-model="currentGoldPrice" 
-            @input="calculateAll"
-            placeholder="Enter current gold price"
-            inputmode="numeric"
-          />
+      <div class="input-section card">
+        <div class="section-header">
+          <h3>📋 Account Overview</h3>
+          <div class="header-actions">
+            <button class="icon-btn" @click="saveToCache" title="Save to cache">
+              💾
+            </button>
+            <button class="icon-btn" @click="loadFromCache" title="Load from cache">
+              📂
+            </button>
+            <button class="icon-btn" @click="clearCache" title="Clear cache">
+              🗑️
+            </button>
+          </div>
         </div>
-
-        <div class="input-group">
-          <label>
-            <span class="label-icon">💳</span>
-            Account Balance (USDC)
-          </label>
-          <input 
-            type="number" 
-            v-model="accountBalance" 
-            @input="calculateAll"
-            placeholder="Enter your balance"
-            inputmode="numeric"
-          />
-        </div>
-
-        <h3>Open Positions</h3>
         
-        <!-- Position List -->
-        <div class="positions-container">
-          <div v-for="(position, index) in positions" :key="index" class="position-card">
-            <div class="position-header">
-              <span class="position-title">Position #{{ index + 1 }}</span>
-              <button class="remove-btn" @click="removePosition(index)" v-if="positions.length > 1">
-                ✕
+        <div class="account-summary">
+          <div class="input-group">
+            <label>
+              <span class="label-icon">💰</span>
+              Gold Price (USD)
+            </label>
+            <div class="input-wrapper">
+              <span class="input-prefix">$</span>
+              <input 
+                type="number" 
+                v-model="currentGoldPrice" 
+                @input="handleInput"
+                placeholder="0.00"
+                inputmode="numeric"
+              />
+              <button 
+                class="refresh-btn" 
+                @click="fetchGoldPrice" 
+                :disabled="loading"
+                :class="{ spinning: loading }"
+                title="Refresh price"
+              >
+                ↻
               </button>
             </div>
-            
-            <div class="position-details">
-              <div class="input-row">
-                <div class="input-group half">
-                  <label>Type</label>
-                  <select v-model="position.type" @change="calculateAll">
-                    <option value="long">Long 📈</option>
-                    <option value="short">Short 📉</option>
-                  </select>
-                </div>
-                
-                <div class="input-group half">
-                  <label>Lots</label>
-                  <input 
-                    type="number" 
-                    v-model="position.lots" 
-                    @input="calculateAll"
-                    step="0.01"
-                    min="0"
-                    inputmode="decimal"
-                  />
-                </div>
-              </div>
-              
-              <div class="input-row">
-                <div class="input-group half">
-                  <label>Entry Price</label>
-                  <input 
-                    type="number" 
-                    v-model="position.entryPrice" 
-                    @input="calculateAll"
-                    inputmode="numeric"
-                  />
-                </div>
-                
-                <div class="input-group half">
-                  <label>Leverage</label>
-                  <input 
-                    type="number" 
-                    v-model="position.leverage" 
-                    @input="calculateAll"
-                    min="1"
-                    inputmode="numeric"
-                  />
-                </div>
-              </div>
-              
-              <!-- Individual Position P&L -->
-              <div class="position-pnl" :class="getPnlClass(position)">
-                <span>P&L: {{ formatUSD(calculatePositionPnl(position)) }}</span>
-                <span class="pnl-percentage">
-                  ({{ formatPercentage(calculatePositionPnlPercentage(position)) }})
-                </span>
-              </div>
+          </div>
+
+          <div class="input-group">
+            <label>
+              <span class="label-icon">💳</span>
+              Balance (USDC)
+            </label>
+            <div class="input-wrapper">
+              <span class="input-prefix">$</span>
+              <input 
+                type="number" 
+                v-model="accountBalance" 
+                @input="handleInput"
+                placeholder="0.00"
+                inputmode="numeric"
+              />
             </div>
           </div>
         </div>
 
-        <!-- Position Actions -->
-        <div class="position-actions">
-          <button class="action-btn" @click="addPosition">
-            <span class="btn-icon">➕</span>
-            Add Position
+        <div class="section-header">
+          <h3>📈 Open Positions <span class="row-count">({{ positions.length }} rows)</span></h3>
+          <button class="add-position-btn" @click="addPosition">
+            <span>➕</span> Add Row
           </button>
-          <button class="action-btn" @click="resetToExample">
+        </div>
+        
+        <!-- Positions Table -->
+        <div class="positions-table-container">
+          <table class="positions-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Type</th>
+                <th>Lots</th>
+                <th>Entry</th>
+                <th>Lev</th>
+                <th>P&L</th>
+                <th>P&L%</th>
+                <th>Liq</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(position, index) in positions" :key="index" :class="position.type">
+                <td class="position-number">{{ index + 1 }}</td>
+                <td>
+                  <select v-model="position.type" @change="handlePositionChange" class="type-select" :class="position.type">
+                    <option value="long">Long 📈</option>
+                    <option value="short">Short 📉</option>
+                  </select>
+                </td>
+                <td>
+                  <input 
+                    type="number" 
+                    v-model="position.lots" 
+                    @input="handlePositionChange"
+                    step="0.01"
+                    min="0"
+                    inputmode="decimal"
+                    class="table-input"
+                  />
+                </td>
+                <td>
+                  <div class="input-wrapper table">
+                    <span class="input-prefix">$</span>
+                    <input 
+                      type="number" 
+                      v-model="position.entryPrice" 
+                      @input="handlePositionChange"
+                      inputmode="numeric"
+                      class="table-input"
+                    />
+                  </div>
+                </td>
+                <td>
+                  <div class="input-wrapper table">
+                    <input 
+                      type="number" 
+                      v-model="position.leverage" 
+                      @input="handlePositionChange"
+                      min="1"
+                      inputmode="numeric"
+                      class="table-input leverage"
+                    />
+                    <span class="input-suffix">x</span>
+                  </div>
+                </td>
+                <td :class="getPnlClass(position)" class="pnl-cell">
+                  {{ formatUSD(calculatePositionPnl(position)) }}
+                </td>
+                <td :class="getPnlClass(position)" class="pnl-percent-cell">
+                  {{ formatPercentage(calculatePositionPnlPercentage(position)) }}
+                </td>
+                <td class="liq-cell">
+                  {{ formatUSD(calculateIndividualLiquidation(position)) }}
+                </td>
+                <td>
+                  <button class="remove-btn small" @click="removePosition(index)" v-if="positions.length > 1">
+                    ✕
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Position Actions -->
+        <div class="quick-actions">
+          <button class="action-btn secondary" @click="resetToExample">
             <span class="btn-icon">📋</span>
-            Load Example
+            Example
+          </button>
+          <button class="action-btn secondary" @click="clearAll">
+            <span class="btn-icon">🗑️</span>
+            Clear
+          </button>
+          <button class="action-btn secondary" @click="duplicateLastPosition">
+            <span class="btn-icon">📋</span>
+            Duplicate
+          </button>
+          <button class="action-btn secondary" @click="sortPositions">
+            <span class="btn-icon">🔽</span>
+            Sort
           </button>
         </div>
       </div>
 
       <!-- Results Section -->
-      <div class="results-section" v-if="hasValidInputs">
-        <h3>Portfolio Analysis</h3>
-        
-        <div class="summary-cards">
-          <div class="summary-card">
-            <div class="summary-label">Total Positions</div>
-            <div class="summary-value">{{ positions.length }}</div>
-          </div>
-          
-          <div class="summary-card">
-            <div class="summary-label">Total Volume</div>
-            <div class="summary-value">{{ totalLots.toFixed(2) }} Lots</div>
-          </div>
-          
-          <div class="summary-card">
-            <div class="summary-label">Total Exposure</div>
-            <div class="summary-value">{{ formatUSD(totalPositionValue) }}</div>
+      <div class="results-section card" v-if="hasValidInputs">
+        <div class="section-header">
+          <h3>📊 Portfolio Analysis</h3>
+          <div class="risk-indicator" :class="riskLevelClass">
+            {{ riskLevel }} Risk
           </div>
         </div>
         
-        <div class="result-card">
-          <div class="result-item highlight">
-            <span class="label">
-              <span class="label-icon">💰</span>
-              Total Margin Used:
-            </span>
-            <span class="value">{{ formatUSD(totalMarginUsed) }}</span>
+        <!-- Summary Cards -->
+        <div class="summary-grid">
+          <div class="summary-card" v-for="stat in portfolioStats" :key="stat.label">
+            <div class="summary-label">{{ stat.label }}</div>
+            <div class="summary-value" :class="stat.class">{{ stat.value }}</div>
+          </div>
+        </div>
+        
+        <!-- Main Metrics -->
+        <div class="metrics-container">
+          <div class="metric-row">
+            <span class="metric-label">💰 Total Margin:</span>
+            <span class="metric-value">{{ formatUSD(totalMarginUsed) }}</span>
           </div>
           
-          <div class="result-item highlight-pnl">
-            <span class="label">
-              <span class="label-icon">📊</span>
-              Total P&L:
-            </span>
-            <span class="value" :class="totalPnlClass">
+          <div class="metric-row" :class="totalPnlClass">
+            <span class="metric-label">📊 Total P&L:</span>
+            <span class="metric-value">
               {{ formatUSD(totalPnl) }}
               <span class="percentage">({{ formatPercentage(totalPnlPercentage) }})</span>
             </span>
           </div>
           
-          <div class="result-item">
-            <span class="label">
-              <span class="label-icon">💵</span>
-              Current Equity:
-            </span>
-            <span class="value">{{ formatUSD(currentEquity) }}</span>
-          </div>
-          
-          <div class="result-item highlight">
-            <span class="label">
-              <span class="label-icon">⚠️</span>
-              Portfolio Liquidation Price:
-            </span>
-            <span class="value liquidation">{{ formatUSD(portfolioLiquidationPrice) }}</span>
-          </div>
-          
-          <div class="result-item">
-            <span class="label">
-              <span class="label-icon">📏</span>
-              Distance to Liquidation:
-            </span>
-            <span class="value" :class="distanceClass">
-              {{ formatUSD(priceDistance) }}
-              <span class="percentage">({{ formatPercentage(percentageDistance) }})</span>
-            </span>
-          </div>
-          
-          <div class="result-item">
-            <span class="label">
-              <span class="label-icon">📉</span>
-              Max Loss Before Liquidation:
-            </span>
-            <span class="value">{{ formatUSD(maxLossBeforeLiquidation) }}</span>
+          <div class="metric-row">
+            <span class="metric-label">💵 Current Equity:</span>
+            <span class="metric-value">{{ formatUSD(currentEquity) }}</span>
           </div>
         </div>
 
-        <!-- Position Breakdown -->
-        <div class="position-breakdown">
-          <h4>Position Breakdown</h4>
-          <div class="breakdown-list">
-            <div v-for="(position, index) in positions" :key="index" class="breakdown-item">
-              <div class="breakdown-header">
-                <span>Position #{{ index + 1 }} ({{ position.type }})</span>
-                <span :class="getPnlClass(position)">
-                  {{ formatUSD(calculatePositionPnl(position)) }}
-                </span>
-              </div>
-              <div class="breakdown-details">
-                <span>{{ position.lots }} lots @ {{ formatUSD(position.entryPrice) }}</span>
-                <span>Liq: {{ formatUSD(calculateIndividualLiquidation(position)) }}</span>
-              </div>
+        <!-- Liquidation Section -->
+        <div class="liquidation-card">
+          <div class="liquidation-price">
+            <div class="price-label">Portfolio Liquidation Price</div>
+            <div class="price-value">{{ formatUSD(portfolioLiquidationPrice) }}</div>
+          </div>
+          
+          <div class="distance-meter">
+            <div class="distance-label">
+              <span>Distance</span>
+              <span :class="distanceClass">{{ formatPercentage(percentageDistance) }}</span>
             </div>
-          </div>
-        </div>
-
-        <!-- Risk Meter -->
-        <div class="risk-meter">
-          <div class="meter-label">
-            <span>Risk Level</span>
-            <span :class="riskLevelClass">{{ riskLevel }}</span>
-          </div>
-          <div class="meter-bar">
-            <div 
-              class="meter-fill" 
-              :class="riskLevelClass"
-              :style="{ width: riskPercentage + '%' }"
-            ></div>
+            <div class="progress-bar">
+              <div 
+                class="progress-fill" 
+                :class="distanceClass"
+                :style="{ width: Math.min(100 - percentageDistance, 100) + '%' }"
+              ></div>
+            </div>
           </div>
         </div>
 
         <!-- Warning Message -->
-        <div class="warning-message" v-if="showWarning">
-          <span class="warning-icon">⚠️</span>
-          <span>{{ warningMessage }}</span>
-        </div>
+        <transition name="slide">
+          <div class="warning-message" v-if="showWarning">
+            <span class="warning-icon">⚠️</span>
+            <span>{{ warningMessage }}</span>
+          </div>
+        </transition>
 
         <!-- Visual Price Scale -->
         <div class="visual-indicator">
-          <h4>Price Scale</h4>
-          <div class="price-scale">
-            <div class="scale-bar">
+          <h4>📏 Price Scale</h4>
+          <div class="price-scale-container">
+            <div class="markers">
               <div 
                 v-for="(pos, index) in positions" 
                 :key="'liq-' + index"
-                class="individual-liquidation-marker"
+                class="marker"
                 :class="pos.type"
                 :style="{ left: getLiquidationPosition(calculateIndividualLiquidation(pos)) + '%' }"
               >
-                <span class="marker-label">P{{ index + 1 }}</span>
+                <span class="marker-tooltip">P{{ index + 1 }}</span>
               </div>
               <div 
-                class="current-price-marker" 
+                class="marker current"
                 :style="{ left: currentPricePosition + '%' }"
               >
-                <span class="marker-label">Current</span>
+                <span class="marker-tooltip">Now</span>
               </div>
               <div 
-                class="portfolio-liquidation-marker" 
+                class="marker portfolio"
                 :style="{ left: portfolioLiquidationPosition + '%' }"
               >
-                <span class="marker-label">Portfolio Liq</span>
+                <span class="marker-tooltip">Liq</span>
               </div>
             </div>
+            
+            <div class="scale-bar">
+              <div class="scale-fill danger" :style="{ width: getDangerZoneWidth() + '%' }"></div>
+              <div class="scale-fill warning" :style="{ width: getWarningZoneWidth() + '%' }"></div>
+              <div class="scale-fill safe" :style="{ width: getSafeZoneWidth() + '%' }"></div>
+            </div>
+            
             <div class="scale-labels">
-              <span>{{ formatCompactUSD(minPrice) }}</span>
-              <span>{{ formatCompactUSD(currentGoldPrice) }}</span>
-              <span>{{ formatCompactUSD(maxPrice) }}</span>
+              <span>{{ formatUSD(minPrice) }}</span>
+              <span>{{ formatUSD(currentGoldPrice) }}</span>
+              <span>{{ formatUSD(maxPrice) }}</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state card" v-else>
+        <div class="empty-icon">📊</div>
+        <h3>No Active Positions</h3>
+        <p>Add positions to see portfolio analysis</p>
+        <div class="empty-actions">
+          <button class="action-btn primary" @click="addPosition">
+            <span>➕</span> Add First Position
+          </button>
+          <button class="action-btn secondary" @click="loadFromCache" v-if="hasCachedData">
+            <span>📂</span> Load from Cache ({{ cachedRowCount }} rows)
+          </button>
         </div>
       </div>
     </div>
@@ -274,45 +318,332 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { useCache } from '../composables/useCache'
+import { useNotification } from '../composables/useNotification'
+
+// Initialize cache and notification
+const { setCache, getCache, removeCache } = useCache()
+const notification = useNotification()
+
+// Cache keys
+const CALCULATOR_CACHE_KEY = 'gold_calculator_cache'
+const CALCULATOR_TIMESTAMP_KEY = 'gold_calculator_timestamp'
+const CACHE_EXPIRY_MINUTES = 60 // Cache expires after 60 minutes
+
+// Gold price API
+const GOLD_API_URL = 'https://api.gold-api.com/price/XAU'
 
 // Props
 const props = defineProps({
   initialGoldPrice: {
     type: Number,
-    default: 4780
+    default: 4870.148
   },
   initialBalance: {
     type: Number,
-    default: 50000
+    default: 10000
   }
 })
 
 // State
 const currentGoldPrice = ref(props.initialGoldPrice)
 const accountBalance = ref(props.initialBalance)
+const cacheLoaded = ref(false)
+const hasCachedData = ref(false)
+const lastCacheTime = ref(null)
+const cachedRowCount = ref(0)
 
-// Positions array
+// Gold price fetching state
+const loading = ref(false)
+const error = ref(null)
+const connectionState = ref('disconnected')
+const connectionMessage = ref('Disconnected')
+const lastUpdateTime = ref(null)
+const goldData = ref(null)
+const goldHistory = ref([])
+const goldTimestamps = ref([])
+
+// Positions array - stores ALL rows
 const positions = ref([
   {
     type: 'long',
-    lots: 1,
-    entryPrice: 4880,
-    leverage: 10
-  },
-  {
-    type: 'long',
-    lots: 1,
-    entryPrice: 4800,
-    leverage: 10
+    lots: 0.1,
+    entryPrice: 4870.148,
+    leverage: 200
   }
 ])
 
 // Constants
-const GOLD_UNIT_PER_LOT = 100
-const MAINTENANCE_MARGIN_RATE = 0.005 // 0.5%
+const GOLD_UNIT_PER_LOT = 100 // 1 lot = 100 troy ounces
 
-// Computed properties
+// ============== GOLD PRICE FETCHING ==============
+const fetchGoldPrice = async () => {
+  if (loading.value) return
+  
+  loading.value = true
+  error.value = null
+
+  try {
+    const response = await fetch(GOLD_API_URL)
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    
+    // Store previous price with timestamp
+    if (goldData.value) {
+      goldHistory.value.push(goldData.value.price)
+      goldTimestamps.value.push(new Date())
+      
+      // Keep only last 30 data points
+      if (goldHistory.value.length > 30) {
+        goldHistory.value.shift()
+        goldTimestamps.value.shift()
+      }
+    }
+    
+    goldData.value = data
+    currentGoldPrice.value = data.price
+    lastUpdateTime.value = new Date().toLocaleTimeString()
+    connectionState.value = 'connected'
+    connectionMessage.value = 'Connected'
+    
+    saveToCache() // Auto-save after price update
+    notification.success('Gold price updated')
+    
+  } catch (err) {
+    error.value = err.message
+    connectionState.value = 'disconnected'
+    connectionMessage.value = 'Disconnected'
+    notification.error(`Failed to fetch gold: ${err.message}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+// Auto-fetch every 2 minutes
+let priceInterval = null
+
+const startPricePolling = () => {
+  fetchGoldPrice()
+  priceInterval = setInterval(fetchGoldPrice, 120000)
+}
+
+const stopPricePolling = () => {
+  if (priceInterval) {
+    clearInterval(priceInterval)
+    priceInterval = null
+  }
+}
+
+// ============== CACHE MANAGEMENT ==============
+const saveToCache = () => {
+  try {
+    // Create a deep copy of positions to ensure all data is saved
+    const positionsCopy = JSON.parse(JSON.stringify(positions.value))
+    
+    const cacheData = {
+      currentGoldPrice: currentGoldPrice.value,
+      accountBalance: accountBalance.value,
+      positions: positionsCopy, // This saves ALL rows
+      timestamp: new Date().toISOString(),
+      rowCount: positions.value.length
+    }
+    
+    // Save with expiry
+    setCache(CALCULATOR_CACHE_KEY, JSON.stringify(cacheData), CACHE_EXPIRY_MINUTES)
+    setCache(CALCULATOR_TIMESTAMP_KEY, new Date().toISOString(), CACHE_EXPIRY_MINUTES)
+    
+    hasCachedData.value = true
+    lastCacheTime.value = new Date().toLocaleTimeString()
+    cachedRowCount.value = positions.value.length
+    
+    notification.success(`Saved ${positions.value.length} position(s) to cache`)
+    console.log('💾 Cached positions:', positions.value.length, 'rows', positionsCopy)
+    
+  } catch (err) {
+    console.error('Failed to save to cache:', err)
+    notification.error('Failed to save to cache')
+  }
+}
+
+const loadFromCache = async () => {
+  try {
+    const cached = getCache(CALCULATOR_CACHE_KEY)
+    const timestamp = getCache(CALCULATOR_TIMESTAMP_KEY)
+    
+    if (cached && timestamp) {
+      const cacheData = JSON.parse(cached)
+      
+      // IMPORTANT: Force a complete re-assignment of the positions array
+      // This ensures Vue's reactivity picks up the change
+      const loadedPositions = cacheData.positions || []
+      
+      // Clear existing array first (optional but helps with reactivity)
+      positions.value = []
+      
+      // Use nextTick to ensure DOM updates properly
+      await nextTick()
+      
+      // Set the new positions
+      positions.value = loadedPositions.map(pos => ({
+        type: pos.type || 'long',
+        lots: Number(pos.lots) || 0.1,
+        entryPrice: Number(pos.entryPrice) || 0,
+        leverage: Number(pos.leverage) || 10
+      }))
+      
+      // Update other values
+      currentGoldPrice.value = cacheData.currentGoldPrice || currentGoldPrice.value
+      accountBalance.value = cacheData.accountBalance || accountBalance.value
+      
+      cacheLoaded.value = true
+      lastCacheTime.value = new Date(timestamp).toLocaleTimeString()
+      cachedRowCount.value = positions.value.length
+      
+      // Force a recalculation
+      calculateAll()
+      
+      notification.success(`Loaded ${positions.value.length} position(s) from cache (saved at ${lastCacheTime.value})`)
+      console.log('📂 Loaded positions:', positions.value.length, 'rows', positions.value)
+      
+      // Auto-hide cache badge after 3 seconds
+      setTimeout(() => {
+        cacheLoaded.value = false
+      }, 3000)
+    } else {
+      notification.info('No cached data found')
+    }
+  } catch (err) {
+    console.error('Failed to load from cache:', err)
+    notification.error('Failed to load from cache')
+  }
+}
+
+const clearCache = () => {
+  try {
+    removeCache(CALCULATOR_CACHE_KEY)
+    removeCache(CALCULATOR_TIMESTAMP_KEY)
+    hasCachedData.value = false
+    lastCacheTime.value = null
+    cachedRowCount.value = 0
+    notification.success('Cache cleared')
+  } catch (err) {
+    console.error('Failed to clear cache:', err)
+    notification.error('Failed to clear cache')
+  }
+}
+
+const checkCache = () => {
+  try {
+    const cached = getCache(CALCULATOR_CACHE_KEY)
+    const timestamp = getCache(CALCULATOR_TIMESTAMP_KEY)
+    
+    hasCachedData.value = !!cached
+    
+    if (timestamp) {
+      lastCacheTime.value = new Date(timestamp).toLocaleTimeString()
+    }
+    
+    if (cached) {
+      const cacheData = JSON.parse(cached)
+      cachedRowCount.value = cacheData.rowCount || cacheData.positions?.length || 0
+      console.log('📦 Cache check:', cachedRowCount.value, 'rows available')
+    }
+  } catch (err) {
+    console.error('Failed to check cache:', err)
+    hasCachedData.value = false
+  }
+}
+
+// ============== INPUT HANDLING ==============
+const handleInput = () => {
+  calculateAll()
+  saveToCache() // Auto-save on any input change
+}
+
+const handlePositionChange = () => {
+  calculateAll()
+  saveToCache() // Auto-save on position changes
+}
+
+// ============== POSITION MANAGEMENT ==============
+const addPosition = () => {
+  positions.value.push({
+    type: 'long',
+    lots: 0.1,
+    entryPrice: currentGoldPrice.value,
+    leverage: 10
+  })
+  handlePositionChange()
+  notification.info(`Added position #${positions.value.length}`)
+}
+
+const removePosition = (index) => {
+  const removed = positions.value[index]
+  positions.value.splice(index, 1)
+  handlePositionChange()
+  notification.info(`Removed position #${index + 1} (${removed.lots} lots)`)
+}
+
+const duplicateLastPosition = () => {
+  if (positions.value.length > 0) {
+    const lastPos = positions.value[positions.value.length - 1]
+    positions.value.push({
+      ...lastPos,
+      lots: lastPos.lots // Copy same lots
+    })
+    handlePositionChange()
+    notification.info(`Duplicated position #${positions.value.length - 1}`)
+  }
+}
+
+const sortPositions = () => {
+  // Sort by entry price (descending)
+  positions.value.sort((a, b) => b.entryPrice - a.entryPrice)
+  handlePositionChange()
+  notification.info('Positions sorted by entry price')
+}
+
+const resetToExample = () => {
+  currentGoldPrice.value = 4870.148
+  accountBalance.value = 10000
+  positions.value = [
+    {
+      type: 'long',
+      lots: 0.1,
+      entryPrice: 4870.148,
+      leverage: 200
+    },
+    {
+      type: 'short',
+      lots: 0.05,
+      entryPrice: 4880.000,
+      leverage: 100
+    },
+    {
+      type: 'long',
+      lots: 0.2,
+      entryPrice: 4860.500,
+      leverage: 50
+    }
+  ]
+  handleInput()
+  notification.info(`Loaded example with ${positions.value.length} positions`)
+}
+
+const clearAll = () => {
+  currentGoldPrice.value = 0
+  accountBalance.value = 0
+  positions.value = []
+  handleInput()
+  notification.info('All positions cleared')
+}
+
+// ============== COMPUTED PROPERTIES ==============
 const totalLots = computed(() => {
   return positions.value.reduce((sum, pos) => sum + Number(pos.lots), 0)
 })
@@ -329,6 +660,25 @@ const totalMarginUsed = computed(() => {
     return sum + (positionValue / pos.leverage)
   }, 0)
 })
+
+// Portfolio Stats
+const portfolioStats = computed(() => [
+  {
+    label: 'Positions',
+    value: positions.value.length,
+    class: ''
+  },
+  {
+    label: 'Volume',
+    value: totalLots.value.toFixed(2) + 'L',
+    class: ''
+  },
+  {
+    label: 'Exposure',
+    value: formatUSD(totalPositionValue.value),
+    class: ''
+  }
+])
 
 // Calculate P&L for each position
 const calculatePositionPnl = (position) => {
@@ -363,29 +713,26 @@ const currentEquity = computed(() => {
 const calculateIndividualLiquidation = (position) => {
   const positionValue = position.lots * GOLD_UNIT_PER_LOT * position.entryPrice
   const marginUsed = positionValue / position.leverage
-  const maintenanceMargin = positionValue * MAINTENANCE_MARGIN_RATE
+  const maintenanceMargin = positionValue * 0.005 // 0.5% maintenance margin
   
-  // For isolated liquidation (treating each position separately)
   const maxLoss = marginUsed - maintenanceMargin
+  const priceMove = maxLoss / (position.lots * GOLD_UNIT_PER_LOT)
   
   if (position.type === 'long') {
-    return position.entryPrice - (maxLoss / (position.lots * GOLD_UNIT_PER_LOT))
+    return position.entryPrice - priceMove
   } else {
-    return position.entryPrice + (maxLoss / (position.lots * GOLD_UNIT_PER_LOT))
+    return position.entryPrice + priceMove
   }
 }
 
-// Portfolio liquidation price (cross-margin)
+// Portfolio liquidation price
 const portfolioLiquidationPrice = computed(() => {
   if (totalMarginUsed.value <= 0 || currentEquity.value <= 0) return 0
   
-  // Calculate weighted average exposure
   let totalDelta = 0
-  let totalSize = 0
   
   positions.value.forEach(pos => {
     const size = pos.lots * GOLD_UNIT_PER_LOT
-    totalSize += size
     if (pos.type === 'long') {
       totalDelta += size
     } else {
@@ -393,18 +740,14 @@ const portfolioLiquidationPrice = computed(() => {
     }
   })
   
-  if (totalDelta === 0) return currentGoldPrice.value // Hedged position
+  if (totalDelta === 0) return currentGoldPrice.value
   
-  // Calculate price change needed to liquidate entire portfolio
-  const maintenanceMargin = totalPositionValue.value * MAINTENANCE_MARGIN_RATE
+  const maintenanceMargin = totalPositionValue.value * 0.005
   const maxLoss = currentEquity.value - maintenanceMargin
   
-  // Direction of liquidation price based on net position
   if (totalDelta > 0) {
-    // Net long
-    return currentGoldPrice.value - (maxLoss / totalDelta)
+    return currentGoldPrice.value - (maxLoss / Math.abs(totalDelta))
   } else {
-    // Net short
     return currentGoldPrice.value + (maxLoss / Math.abs(totalDelta))
   }
 })
@@ -415,17 +758,6 @@ const priceDistance = computed(() => {
 
 const percentageDistance = computed(() => {
   return currentGoldPrice.value ? (priceDistance.value / currentGoldPrice.value) * 100 : 0
-})
-
-const maxLossBeforeLiquidation = computed(() => {
-  return Math.abs(priceDistance.value * Math.abs(totalDelta))
-})
-
-const totalDelta = computed(() => {
-  return positions.value.reduce((sum, pos) => {
-    const size = pos.lots * GOLD_UNIT_PER_LOT
-    return sum + (pos.type === 'long' ? size : -size)
-  }, 0)
 })
 
 const hasValidInputs = computed(() => {
@@ -466,23 +798,19 @@ const riskLevelClass = computed(() => {
   return riskLevel.value.toLowerCase()
 })
 
-const riskPercentage = computed(() => {
-  return Math.min(Math.abs(totalPnl.value) / accountBalance.value * 100, 100)
-})
-
 const showWarning = computed(() => {
   return percentageDistance.value < 5 || Math.abs(totalPnl.value) > accountBalance.value * 0.5
 })
 
 const warningMessage = computed(() => {
   if (Math.abs(totalPnl.value) > accountBalance.value * 0.5) {
-    return 'High drawdown - Portfolio at risk'
+    return 'High drawdown - Portfolio at risk!'
   }
   if (percentageDistance.value < 3) {
-    return 'Very close to portfolio liquidation!'
+    return 'Critical: Close to liquidation!'
   }
   if (percentageDistance.value < 5) {
-    return 'Approaching liquidation - Monitor closely'
+    return 'Warning: Approaching liquidation'
   }
   return ''
 })
@@ -521,41 +849,26 @@ const getLiquidationPosition = (price) => {
   return range ? ((price - minPrice.value) / range) * 100 : 50
 }
 
+const getDangerZoneWidth = () => {
+  const liqPos = portfolioLiquidationPosition.value
+  return Math.min(liqPos, 100)
+}
+
+const getWarningZoneWidth = () => {
+  const currentPos = currentPricePosition.value
+  const liqPos = portfolioLiquidationPosition.value
+  const warningZone = Math.min(15, Math.abs(currentPos - liqPos) / 2)
+  return currentPos > liqPos ? warningZone : 0
+}
+
+const getSafeZoneWidth = () => {
+  const currentPos = currentPricePosition.value
+  return 100 - currentPos
+}
+
 // Methods
 const calculateAll = () => {
-  // Triggered by reactivity
-}
-
-const addPosition = () => {
-  positions.value.push({
-    type: 'long',
-    lots: 0.1,
-    entryPrice: currentGoldPrice.value,
-    leverage: 10
-  })
-}
-
-const removePosition = (index) => {
-  positions.value.splice(index, 1)
-}
-
-const resetToExample = () => {
-  currentGoldPrice.value = 4780
-  accountBalance.value = 50000
-  positions.value = [
-    {
-      type: 'long',
-      lots: 1,
-      entryPrice: 4880,
-      leverage: 10
-    },
-    {
-      type: 'long',
-      lots: 1,
-      entryPrice: 4800,
-      leverage: 10
-    }
-  ]
+  // This triggers reactivity
 }
 
 const formatUSD = (value) => {
@@ -564,44 +877,143 @@ const formatUSD = (value) => {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
+    useGrouping: true
   }).format(value)
-}
-
-const formatCompactUSD = (value) => {
-  if (isNaN(value) || !isFinite(value)) return '$0'
-  if (Math.abs(value) >= 1e6) {
-    return '$' + (value / 1e6).toFixed(1) + 'M'
-  }
-  if (Math.abs(value) >= 1e3) {
-    return '$' + (value / 1e3).toFixed(1) + 'K'
-  }
-  return '$' + value.toFixed(0)
 }
 
 const formatPercentage = (value) => {
   if (isNaN(value) || !isFinite(value)) return '0.00%'
   return value.toFixed(2) + '%'
 }
+
+// Watch for changes and auto-save
+watch([currentGoldPrice, accountBalance, positions], () => {
+  calculateAll()
+}, { deep: true })
+
+// Lifecycle
+onMounted(() => {
+  checkCache()
+  calculateAll()
+  startPricePolling()
+})
+
+onUnmounted(() => {
+  stopPricePolling()
+})
 </script>
 
 <style scoped>
+/* Modern CSS Reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 /* Base Styles */
 .gold-calculator {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 20px;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 20px;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: linear-gradient(145deg, #1a1f2e 0%, #1e2436 100%);
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+.calculator-header {
+  margin-bottom: 20px;
+  padding: 14px;
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
 h2 {
-  margin: 0 0 20px 0;
   color: white;
-  text-align: center;
-  font-size: clamp(1.5rem, 5vw, 2rem);
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Connection Status */
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 30px;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.connection-status.connected {
+  color: #4CAF50;
+}
+
+.connection-status.disconnected {
+  color: #f44336;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.connected .status-dot {
+  background: #4CAF50;
+  box-shadow: 0 0 8px #4CAF50;
+}
+
+.last-update {
+  color: #a0a8c0;
+  font-size: 0.8rem;
+  margin-left: 4px;
+}
+
+/* Cache Status */
+.cache-status {
+  display: inline-block;
+}
+
+.cache-badge {
+  background: #4CAF50;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease;
+}
+
+.cache-info {
+  color: #a0a8c0;
+  font-size: 0.8rem;
+}
+
+.cache-time {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 4px 10px;
+  border-radius: 16px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .calculator-grid {
@@ -610,68 +1022,121 @@ h2 {
   gap: 20px;
 }
 
-/* Input Section */
-.input-section {
-  background: rgba(255, 255, 255, 0.95);
-  padding: clamp(15px, 4vw, 25px);
-  border-radius: 15px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+/* Card Styles */
+.card {
+  background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Section Headers */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 h3 {
-  margin: 0 0 15px 0;
-  color: #333;
-  font-size: clamp(1.1rem, 4vw, 1.3rem);
-  border-bottom: 2px solid #667eea;
-  padding-bottom: 8px;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: #1e2436;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-h4 {
-  margin: 0 0 10px 0;
-  color: #555;
+.row-count {
+  font-size: 0.9rem;
+  color: #718096;
+  font-weight: normal;
+}
+
+.header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  border: none;
+  background: #f0f0f0;
+  color: #4a5568;
   font-size: 1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  background: #667eea;
+  color: white;
+  transform: scale(1.05);
+}
+
+/* Input Styles */
+.account-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
 .input-group {
-  margin-bottom: 15px;
-}
-
-.input-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.half {
   margin-bottom: 0;
-}
-
-.label-icon {
-  margin-right: 5px;
-  font-size: 1.1em;
 }
 
 label {
   display: flex;
   align-items: center;
-  margin-bottom: 5px;
-  color: #555;
-  font-size: 0.9em;
+  gap: 6px;
+  color: #4a5568;
+  font-size: 0.9rem;
   font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-prefix {
+  position: absolute;
+  left: 10px;
+  color: #667eea;
+  font-weight: 600;
+  font-size: 1rem;
+  z-index: 1;
+}
+
+.input-suffix {
+  position: absolute;
+  right: 10px;
+  color: #667eea;
+  font-weight: 600;
+  font-size: 1rem;
 }
 
 input {
   width: 100%;
-  padding: 12px 15px;
-  border: 2px solid #e0e0e0;
+  padding: 10px 14px;
+  padding-left: 24px;
+  border: 2px solid #e2e8f0;
   border-radius: 10px;
-  font-size: 1em;
-  box-sizing: border-box;
-  transition: all 0.3s ease;
+  font-size: 1rem;
   background: white;
-  -webkit-appearance: none;
 }
 
 input:focus {
@@ -680,847 +1145,655 @@ input:focus {
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-/* Position Type Buttons */
-.position-type {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin: 20px 0;
+.refresh-btn {
+  position: absolute;
+  right: 6px;
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #667eea;
+  padding: 4px 6px;
+  border-radius: 6px;
 }
 
-.position-btn {
-  padding: 15px;
-  border: none;
+.refresh-btn.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Table Styles */
+.positions-table-container {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
-  font-size: 1.1em;
+}
+
+.positions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.positions-table th {
+  background: #f7fafc;
+  padding: 12px 6px;
+  text-align: left;
   font-weight: 600;
+  color: #4a5568;
+  border-bottom: 2px solid #e2e8f0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.positions-table td {
+  padding: 10px 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.positions-table tr.long td {
+  border-left: 3px solid #4CAF50;
+}
+
+.positions-table tr.short td {
+  border-left: 3px solid #f44336;
+}
+
+.position-number {
+  font-weight: 600;
+  color: #667eea;
+  text-align: center;
+}
+
+.type-select {
+  width: 90px;
+  padding: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  background: white;
   cursor: pointer;
-  transition: all 0.3s ease;
+}
+
+.type-select.long {
+  color: #4CAF50;
+  font-weight: 600;
+}
+
+.type-select.short {
+  color: #f44336;
+  font-weight: 600;
+}
+
+.table-input {
+  width: 80px;
+  padding: 6px;
+  padding-left: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.table-input.leverage {
+  padding-left: 6px;
+  width: 60px;
+}
+
+.input-wrapper.table .input-prefix {
+  left: 4px;
+  font-size: 0.8rem;
+}
+
+.input-wrapper.table .input-suffix {
+  right: 4px;
+  font-size: 0.8rem;
+}
+
+.pnl-cell {
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: right;
+  padding-right: 10px;
+}
+
+.pnl-percent-cell {
+  font-size: 0.85rem;
+  text-align: right;
+  padding-right: 10px;
+}
+
+.pnl-cell.positive, .pnl-percent-cell.positive {
+  color: #4CAF50;
+}
+
+.pnl-cell.negative, .pnl-percent-cell.negative {
+  color: #f44336;
+}
+
+.liq-cell {
+  color: #ff9800;
+  font-size: 0.85rem;
+  text-align: right;
+  padding-right: 10px;
+}
+
+.remove-btn.small {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  border: none;
   background: #f0f0f0;
   color: #666;
+  font-size: 0.9rem;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.remove-btn.small:hover {
+  background: #f44336;
+  color: white;
+}
+
+/* Action Buttons */
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 
-.position-btn.active {
-  background: #667eea;
-  color: white;
-  transform: scale(1.02);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-}
-
-.btn-icon {
-  font-size: 1.2em;
-}
-
-/* Quick Actions */
-.quick-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 15px;
-}
-
-.quick-btn {
-  padding: 12px;
-  border: 2px solid #667eea;
+.action-btn {
+  padding: 10px 8px;
+  border: none;
   border-radius: 10px;
-  background: transparent;
-  color: #667eea;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 0.9rem;
 }
 
-.quick-btn:hover {
+.action-btn.primary {
   background: #667eea;
   color: white;
+}
+
+.action-btn.secondary {
+  background: #f0f0f0;
+  color: #4a5568;
+  border: 2px solid transparent;
+}
+
+.action-btn.primary:hover {
+  background: #5a67d8;
+}
+
+.action-btn.secondary:hover {
+  background: #e2e8f0;
+}
+
+.add-position-btn {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* Results Section */
 .results-section {
-  background: rgba(255, 255, 255, 0.95);
-  padding: clamp(15px, 4vw, 25px);
-  border-radius: 15px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.98);
 }
 
-.result-card {
-  background: #f8f9fa;
-  padding: 15px;
-  border-radius: 12px;
+.risk-indicator {
+  padding: 4px 12px;
+  border-radius: 30px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
-.result-item {
+.risk-indicator.critical {
+  background: #f44336;
+  color: white;
+}
+
+.risk-indicator.high {
+  background: #ff9800;
+  color: white;
+}
+
+.risk-indicator.medium {
+  background: #ffeb3b;
+  color: #333;
+}
+
+.risk-indicator.low {
+  background: #4CAF50;
+  color: white;
+}
+
+/* Summary Grid */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  background: linear-gradient(145deg, #667eea, #764ba2);
+  color: white;
+  padding: 14px;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.summary-label {
+  font-size: 0.8rem;
+  opacity: 0.9;
+  margin-bottom: 6px;
+}
+
+.summary-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+/* Metrics Container */
+.metrics-container {
+  background: #f7fafc;
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.metric-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #eee;
-  flex-wrap: wrap;
-  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 1rem;
 }
 
-.result-item:last-child {
+.metric-row:last-child {
   border-bottom: none;
 }
 
-.result-item.highlight {
-  background: #e3f2fd;
-  margin: 5px -15px;
-  padding: 15px;
-  border-radius: 8px;
-  font-weight: bold;
-}
-
-.result-item.highlight-pnl {
-  background: #f5f5f5;
-  margin: 5px -15px;
-  padding: 15px;
-  border-radius: 8px;
-}
-
-.label {
-  display: flex;
-  align-items: center;
-  color: #666;
-  font-size: 0.95em;
-}
-
-.value {
-  font-weight: 600;
-  color: #333;
-  text-align: right;
-}
-
-.percentage {
-  font-size: 0.8em;
-  margin-left: 5px;
-  opacity: 0.8;
-  display: inline-block;
-}
-
-.value.positive {
+.metric-row.positive {
   color: #4CAF50;
 }
 
-.value.negative {
+.metric-row.negative {
   color: #f44336;
 }
 
-.value.liquidation {
+.metric-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #4a5568;
+}
+
+.metric-value {
+  font-weight: 600;
+  color: #1e2436;
+}
+
+.percentage {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin-left: 6px;
+}
+
+/* Liquidation Card */
+.liquidation-card {
+  background: linear-gradient(145deg, #1a1f2e, #2d3748);
+  color: white;
+  border-radius: 18px;
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.liquidation-price {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.price-label {
+  font-size: 0.85rem;
+  color: #a0a8c0;
+  margin-bottom: 4px;
+}
+
+.price-value {
+  font-size: 2rem;
+  font-weight: 700;
   color: #ff9800;
-  font-size: 1.1em;
 }
 
-/* Margin Meter */
-.margin-meter {
-  margin-top: 15px;
-  padding: 10px 0;
+.distance-meter {
+  margin: 14px 0;
 }
 
-.meter-label {
+.distance-label {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 5px;
-  font-size: 0.9em;
-  color: #666;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
 }
 
-.meter-bar {
+.progress-bar {
   height: 8px;
-  background: #e0e0e0;
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   overflow: hidden;
 }
 
-.meter-fill {
+.progress-fill {
   height: 100%;
-  transition: width 0.3s ease;
 }
 
-.meter-fill.safe {
-  background: #4CAF50;
+.progress-fill.danger {
+  background: #f44336;
 }
 
-.meter-fill.warning {
+.progress-fill.warning {
   background: #ff9800;
 }
 
-.meter-fill.danger {
-  background: #f44336;
+.progress-fill.safe {
+  background: #4CAF50;
 }
 
 /* Warning Message */
 .warning-message {
-  margin-top: 15px;
-  padding: 12px;
   background: #fff3cd;
   border: 1px solid #ffeeba;
-  border-radius: 8px;
   color: #856404;
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 18px;
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 0.95em;
+  font-size: 0.9rem;
 }
 
 .warning-icon {
-  font-size: 1.2em;
+  font-size: 1.4rem;
 }
 
 /* Visual Indicator */
 .visual-indicator {
-  margin-top: 20px;
+  background: #f7fafc;
+  border-radius: 16px;
+  padding: 18px;
 }
 
-.price-scale {
-  margin-top: 20px;
+.visual-indicator h4 {
+  color: #1e2436;
+  margin-bottom: 16px;
+  font-size: 1.1rem;
 }
 
-.scale-bar {
+.price-scale-container {
   position: relative;
-  height: 6px;
-  background: linear-gradient(to right, #f44336, #ffeb3b, #4CAF50);
-  border-radius: 3px;
-  margin: 20px 0;
+  padding: 20px 0;
 }
 
-.current-price-marker,
-.liquidation-marker {
+.markers {
+  position: relative;
+  height: 35px;
+  margin-bottom: 12px;
+}
+
+.marker {
   position: absolute;
-  bottom: 15px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
   transform: translateX(-50%);
-  cursor: pointer;
 }
 
-.current-price-marker {
-  width: 16px;
-  height: 16px;
-  background: #2196F3;
-  border: 3px solid white;
-  border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+.marker.long {
+  background: #4CAF50;
+  border: 2px solid white;
 }
 
-.liquidation-marker {
-  width: 16px;
-  height: 16px;
+.marker.short {
   background: #f44336;
-  border: 3px solid white;
-  border-radius: 50%;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  border: 2px solid white;
 }
 
-.marker-label {
+.marker.current {
+  background: #2196F3;
+  border: 2px solid white;
+  width: 16px;
+  height: 16px;
+  z-index: 3;
+}
+
+.marker.portfolio {
+  background: #9c27b0;
+  border: 2px solid white;
+  width: 16px;
+  height: 16px;
+  z-index: 2;
+}
+
+.marker-tooltip {
   position: absolute;
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  white-space: nowrap;
-  background: rgba(0,0,0,0.8);
+  background: rgba(0, 0, 0, 0.8);
   color: white;
   padding: 4px 8px;
   border-radius: 4px;
-  font-size: 0.7em;
-  opacity: 0;
-  transition: opacity 0.2s ease;
+  font-size: 0.7rem;
+  white-space: nowrap;
   pointer-events: none;
 }
 
-.current-price-marker:hover .marker-label,
-.liquidation-marker:hover .marker-label {
-  opacity: 1;
+.scale-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+
+.scale-fill {
+  height: 100%;
+}
+
+.scale-fill.danger {
+  background: #f44336;
+}
+
+.scale-fill.warning {
+  background: #ff9800;
+}
+
+.scale-fill.safe {
+  background: #4CAF50;
 }
 
 .scale-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 0.8em;
-  color: #666;
-  margin-top: 5px;
-}
-
-.min-price,
-.max-price {
-  color: #999;
-}
-
-.current-price {
-  color: #2196F3;
-  font-weight: 600;
-}
-
-/* Risk Badge */
-.risk-badge {
-  margin-top: 20px;
-  padding: 15px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-weight: 600;
-  animation: pulse 2s infinite;
-}
-
-.risk-badge.critical {
-  background: #f44336;
-  color: white;
-}
-
-.risk-badge.high {
-  background: #ff9800;
-  color: white;
-}
-
-.risk-badge.medium {
-  background: #ffeb3b;
-  color: #333;
-}
-
-.risk-badge.low {
-  background: #4CAF50;
-  color: white;
-}
-
-.risk-icon {
-  font-size: 1.3em;
+  font-size: 0.8rem;
+  color: #718096;
+  margin-top: 8px;
 }
 
 /* Empty State */
 .empty-state {
-  background: rgba(255, 255, 255, 0.95);
-  padding: 40px 20px;
-  border-radius: 15px;
   text-align: center;
-  backdrop-filter: blur(10px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 300px;
+  padding: 50px 30px;
 }
 
 .empty-icon {
-  font-size: 4em;
+  font-size: 5rem;
   margin-bottom: 20px;
   opacity: 0.5;
 }
 
-.empty-state p {
-  color: #666;
-  font-size: 1.1em;
-  margin: 0;
+.empty-state h3 {
+  color: #1e2436;
+  margin-bottom: 12px;
+  font-size: 1.5rem;
 }
 
-/* Animations */
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.02);
-  }
-  100% {
-    transform: scale(1);
-  }
+.empty-state p {
+  color: #718096;
+  margin-bottom: 24px;
+  font-size: 1rem;
+}
+
+.empty-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 /* Responsive Design */
-@media (max-width: 768px) {
-  .gold-calculator {
-    padding: 10px;
-    border-radius: 15px;
+@media (max-width: 1024px) {
+  .quick-actions {
+    grid-template-columns: repeat(2, 1fr);
   }
+}
 
+@media (max-width: 768px) {
   .calculator-grid {
     grid-template-columns: 1fr;
-    gap: 15px;
   }
-
-  .input-section,
-  .results-section {
-    padding: 15px;
+  
+  .account-summary {
+    grid-template-columns: 1fr;
   }
-
-  .result-item {
+  
+  .positions-table {
+    font-size: 0.8rem;
+  }
+  
+  .table-input {
+    width: 70px;
+  }
+  
+  .type-select {
+    width: 80px;
+  }
+  
+  .price-value {
+    font-size: 1.6rem;
+  }
+  
+  .header-top {
     flex-direction: column;
     align-items: flex-start;
-    gap: 5px;
-  }
-
-  .value {
-    width: 100%;
-    text-align: left;
-  }
-
-  .percentage {
-    display: block;
-    margin-left: 0;
-    margin-top: 2px;
-  }
-
-  .marker-label {
-    display: none;
-  }
-
-  .risk-badge {
-    padding: 12px;
   }
 }
 
 @media (max-width: 480px) {
-  .input-row {
-    grid-template-columns: 1fr;
-    gap: 15px;
+  .gold-calculator {
+    padding: 12px;
   }
-
+  
+  .card {
+    padding: 16px;
+  }
+  
   .quick-actions {
     grid-template-columns: 1fr;
   }
-
-  .position-btn {
-    padding: 12px;
-    font-size: 1em;
+  
+  .summary-grid {
+    grid-template-columns: 1fr;
   }
-
-  .result-item.highlight,
-  .result-item.highlight-pnl {
-    margin: 5px -10px;
-    padding: 12px;
+  
+  .positions-table {
+    font-size: 0.7rem;
   }
-
-  .scale-labels {
-    font-size: 0.7em;
+  
+  .table-input {
+    width: 60px;
+    padding: 4px;
   }
-
-  .warning-message {
+  
+  .type-select {
+    width: 70px;
+    font-size: 0.7rem;
+  }
+  
+  .marker-tooltip {
+    display: none;
+  }
+  
+  .empty-actions {
     flex-direction: column;
-    text-align: center;
-  }
-}
-
-/* Touch Device Optimizations */
-@media (hover: none) and (pointer: coarse) {
-  input {
-    font-size: 16px; /* Prevents zoom on iOS */
-  }
-
-  .position-btn,
-  .quick-btn {
-    min-height: 48px; /* Better touch target */
-  }
-
-  .current-price-marker,
-  .liquidation-marker {
-    width: 20px;
-    height: 20px;
-  }
-}
-
-/* Landscape Mode */
-@media (max-height: 600px) and (orientation: landscape) {
-  .gold-calculator {
-    padding: 10px;
-  }
-
-  .calculator-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .input-section,
-  .results-section {
-    max-height: 90vh;
-    overflow-y: auto;
-  }
-}
-
-/* High-resolution Screens */
-@media (min-width: 1440px) {
-  .gold-calculator {
-    max-width: 1400px;
-  }
-
-  .input-section,
-  .results-section {
-    padding: 30px;
-  }
-
-  input {
-    padding: 15px 20px;
-    font-size: 1.1em;
   }
 }
 
 /* Dark Mode Support */
 @media (prefers-color-scheme: dark) {
-  .gold-calculator {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  }
-
-  .input-section,
-  .results-section {
-    background: rgba(30, 30, 46, 0.95);
-  }
-
-  h3 {
-    color: #fff;
-    border-bottom-color: #4a4a6a;
-  }
-
-  label {
-    color: #ccc;
-  }
-
-  input {
-    background: #2a2a3a;
-    border-color: #3a3a4a;
-    color: #fff;
-  }
-
-  input:focus {
-    border-color: #667eea;
-  }
-
-  .result-card {
-    background: #2a2a3a;
-  }
-
-  .label {
-    color: #aaa;
-  }
-
-  .value {
-    color: #fff;
-  }
-
-  .result-item.highlight {
-    background: #1e1e2e;
-  }
-
-  .result-item.highlight-pnl {
-    background: #252535;
-  }
-
-  .empty-state {
-    background: rgba(30, 30, 46, 0.95);
-  }
-
-  .empty-state p {
-    color: #aaa;
-  }
-}
-
-/* Print Styles */
-@media print {
-  .gold-calculator {
-    background: white;
-    box-shadow: none;
-  }
-
-  .input-section,
-  .results-section {
-    background: white;
-    box-shadow: none;
-    border: 1px solid #ddd;
-  }
-
-  .quick-actions,
-  .position-btn,
-  .risk-badge {
-    display: none;
-  }
-}
-.positions-container {
-  max-height: 400px;
-  overflow-y: auto;
-  padding-right: 5px;
-  margin-bottom: 15px;
-}
-
-.position-card {
-  background: #f8f9fa;
-  border-radius: 10px;
-  padding: 15px;
-  margin-bottom: 15px;
-  border: 1px solid #e0e0e0;
-  transition: all 0.3s ease;
-}
-
-.position-card:hover {
-  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-}
-
-.position-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.position-title {
-  font-weight: 600;
-  color: #333;
-}
-
-.remove-btn {
-  background: none;
-  border: none;
-  color: #999;
-  font-size: 1.2em;
-  cursor: pointer;
-  padding: 0 5px;
-  transition: color 0.3s ease;
-}
-
-.remove-btn:hover {
-  color: #f44336;
-}
-
-select {
-  width: 100%;
-  padding: 10px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 1em;
-  background: white;
-  cursor: pointer;
-}
-
-.position-pnl {
-  margin-top: 10px;
-  padding: 8px;
-  background: #f0f0f0;
-  border-radius: 6px;
-  font-size: 0.9em;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.position-pnl.positive {
-  background: #e8f5e8;
-  color: #4CAF50;
-}
-
-.position-pnl.negative {
-  background: #ffebee;
-  color: #f44336;
-}
-
-.pnl-percentage {
-  font-size: 0.85em;
-  opacity: 0.8;
-}
-
-.position-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 15px;
-}
-
-.action-btn {
-  padding: 12px;
-  border: none;
-  border-radius: 8px;
-  background: #667eea;
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-}
-
-.action-btn:hover {
-  background: #5a67d8;
-  transform: translateY(-2px);
-}
-
-.summary-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.summary-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 12px;
-  border-radius: 10px;
-  text-align: center;
-}
-
-.summary-label {
-  font-size: 0.8em;
-  opacity: 0.9;
-  margin-bottom: 5px;
-}
-
-.summary-value {
-  font-size: 1.1em;
-  font-weight: 600;
-}
-
-.position-breakdown {
-  margin-top: 20px;
-  background: #f8f9fa;
-  border-radius: 10px;
-  padding: 15px;
-}
-
-.breakdown-list {
-  margin-top: 10px;
-}
-
-.breakdown-item {
-  padding: 10px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.breakdown-item:last-child {
-  border-bottom: none;
-}
-
-.breakdown-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 5px;
-  font-weight: 500;
-}
-
-.breakdown-details {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.9em;
-  color: #666;
-}
-
-.risk-meter {
-  margin-top: 20px;
-  padding: 10px 0;
-}
-
-.meter-label {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 5px;
-  font-size: 0.9em;
-  color: #666;
-}
-
-.meter-bar {
-  height: 8px;
-  background: #e0e0e0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.meter-fill {
-  height: 100%;
-  transition: width 0.3s ease;
-}
-
-.meter-fill.critical {
-  background: #f44336;
-}
-
-.meter-fill.high {
-  background: #ff9800;
-}
-
-.meter-fill.medium {
-  background: #ffeb3b;
-}
-
-.meter-fill.low {
-  background: #4CAF50;
-}
-
-.individual-liquidation-marker {
-  position: absolute;
-  width: 8px;
-  height: 8px;
-  background: #ff9800;
-  border: 2px solid white;
-  border-radius: 50%;
-  transform: translateX(-50%);
-  bottom: 15px;
-}
-
-.individual-liquidation-marker.long {
-  background: #2196F3;
-}
-
-.individual-liquidation-marker.short {
-  background: #f44336;
-}
-
-.portfolio-liquidation-marker {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  background: #9c27b0;
-  border: 3px solid white;
-  border-radius: 50%;
-  transform: translateX(-50%);
-  bottom: 15px;
-  box-shadow: 0 2px 8px rgba(156, 39, 176, 0.4);
-}
-
-/* Dark mode adjustments */
-@media (prefers-color-scheme: dark) {
-  .position-card {
-    background: #2a2a3a;
-    border-color: #3a3a4a;
+  .card {
+    background: rgba(30, 35, 48, 0.98);
   }
   
-  .position-title {
-    color: #fff;
+  h3, h4, .label, .metric-label {
+    color: #e2e8f0;
   }
   
-  select {
-    background: #2a2a3a;
-    border-color: #3a3a4a;
-    color: #fff;
+  input, select {
+    background: #2d3748;
+    border-color: #4a5568;
+    color: white;
   }
   
-  .position-pnl {
-    background: #353545;
+  .positions-table th {
+    background: #1e2436;
+    color: #e2e8f0;
   }
   
-  .position-breakdown {
-    background: #2a2a3a;
+  .positions-table td {
+    border-color: #4a5568;
   }
   
-  .breakdown-details {
-    color: #aaa;
-  }
-}
-
-/* Mobile optimizations */
-@media (max-width: 768px) {
-  .summary-cards {
-    grid-template-columns: 1fr;
+  .metrics-container,
+  .visual-indicator {
+    background: #1e2436;
   }
   
-  .position-actions {
-    grid-template-columns: 1fr;
+  .metric-label {
+    color: #a0a8c0;
   }
   
-  .positions-container {
-    max-height: 350px;
+  .metric-value {
+    color: #e2e8f0;
+  }
+  
+  .empty-state h3 {
+    color: #e2e8f0;
   }
 }
 </style>
