@@ -11,19 +11,15 @@
             <div class="menu-container">
                 <nav class="menu">
                     <RouterLink @click="closeSidebar" to="/overview">
-                        <!-- <span class="menu-icon">📊</span> -->
                         <span class="menu-text">Overview</span>
                     </RouterLink>
                     <RouterLink @click="closeSidebar" to="/transaction">
-                        <!-- <span class="menu-icon">📈</span> -->
                         <span class="menu-text">Transaction</span>
                     </RouterLink>
                     <RouterLink @click="closeSidebar" to="/performance">
-                        <!-- <span class="menu-icon">📈</span> -->
                         <span class="menu-text">Performance</span>
                     </RouterLink>
                     <RouterLink @click="closeSidebar" to="/insight">
-                        <!-- <span class="menu-icon">💡</span> -->
                         <span class="menu-text">Insight</span>
                     </RouterLink>
                     <RouterLink @click="closeSidebar" to="/market" class="notification-link">
@@ -31,18 +27,15 @@
                         <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount }}</span>
                     </RouterLink>
                     <RouterLink @click="closeSidebar" to="/report">
-                        <!-- <span class="menu-icon">📄</span> -->
                         <span class="menu-text">Report</span>
                     </RouterLink>
                     <RouterLink @click="closeSidebar" to="/calculator">
-                        <!-- <span class="menu-icon">📄</span> -->
                         <span class="menu-text">Calculator</span>
                     </RouterLink>
                     
                     <div class="menu-group">
                         <div class="menu-parent" @click="toggleSetting">
                             <span class="menu-parent-content">
-                                <!-- <span class="menu-icon">⚙️</span> -->
                                 <span class="menu-text">Setting</span>
                             </span>
                             <span class="arrow">{{ settingOpen ? '▾' : '▸' }}</span>
@@ -50,16 +43,13 @@
 
                         <div v-if="settingOpen" class="submenu">
                             <RouterLink @click="closeSidebar" to="/setting/users">
-                                <!-- <span class="menu-icon">👥</span> -->
                                 <span class="menu-text">Users</span>
                             </RouterLink>
 
                             <RouterLink @click="closeSidebar" to="/setting/configuration">
-                                <!-- <span class="menu-icon">⚙️</span> -->
                                 <span class="menu-text">Configuration</span>
                             </RouterLink>
                              <RouterLink @click="closeSidebar" to="/cache">
-                                <!-- <span class="menu-icon">⚙️</span> -->
                                 <span class="menu-text">Cache</span>
                             </RouterLink>
                         </div>
@@ -132,6 +122,34 @@
 
             <!-- Content -->
             <main class="content">
+                <!-- Datetime and Trading Sessions Widget -->
+                <div class="datetime-session-widget">
+                    <div class="datetime-card">
+                        <div class="datetime-icon">{{ currentTimeIcon }}</div>
+                        <div class="datetime-info">
+                            <div class="date">{{ currentDate }}</div>
+                            <div class="time">{{ currentTime }}</div>
+                        </div>
+                    </div>
+                    <div class="sessions-card">
+                        <div class="session" :class="{ active: isSessionActive('asia') }">
+                            <span class="session-icon">🌏</span>
+                            <span class="session-name">Asia</span>
+                            <span class="session-status">{{ getSessionStatus('asia') }}</span>
+                        </div>
+                        <div class="session" :class="{ active: isSessionActive('london') }">
+                            <span class="session-icon">🇬🇧</span>
+                            <span class="session-name">London</span>
+                            <span class="session-status">{{ getSessionStatus('london') }}</span>
+                        </div>
+                        <div class="session" :class="{ active: isSessionActive('newyork') }">
+                            <span class="session-icon">🇺🇸</span>
+                            <span class="session-name">New York</span>
+                            <span class="session-status">{{ getSessionStatus('newyork') }}</span>
+                        </div>
+                    </div>
+                </div>
+                
                 <router-view />
             </main>
         </div>
@@ -154,10 +172,128 @@ const settingOpen = ref(false)
 const username = ref('')
 const isMobileProfileOpen = ref(false)
 
+// Datetime state
+const currentDateTime = ref(new Date())
+let datetimeInterval = null
+
 // Notification state
 const unreadCount = ref(0)
 const notifications = ref([])
 let pollingInterval = null
+
+// Compute current date
+const currentDate = computed(() => {
+    return currentDateTime.value.toLocaleDateString(undefined, { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    })
+})
+
+// Compute current time in 24-hour format
+const currentTime = computed(() => {
+    return currentDateTime.value.toLocaleTimeString(undefined, { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit',
+        hour12: false 
+    })
+})
+
+// Get time icon based on hour
+const currentTimeIcon = computed(() => {
+    const hour = currentDateTime.value.getHours()
+    
+    if (hour >= 5 && hour < 12) {
+        return '🌅' // Morning
+    } else if (hour >= 12 && hour < 17) {
+        return '☀️' // Afternoon
+    } else if (hour >= 17 && hour < 20) {
+        return '🌆' // Evening
+    } else {
+        return '🌙' // Night
+    }
+})
+
+// Trading session times (UTC)
+const getSessionStatus = (session) => {
+    const now = currentDateTime.value
+    const utcHour = now.getUTCHours()
+    const utcMinute = now.getUTCMinutes()
+    const currentUTC = utcHour + utcMinute / 60
+    
+    let start, end
+    
+    switch(session) {
+        case 'asia':
+            // Asia session: 00:00 - 09:00 UTC (Tokyo, Sydney, Hong Kong)
+            start = 0
+            end = 9
+            if (currentUTC >= start && currentUTC < end) {
+                const remaining = end - currentUTC
+                return `Active (${remaining.toFixed(1)}h left)`
+            } else if (currentUTC < start) {
+                const waitTime = start - currentUTC
+                return `Starts in ${waitTime.toFixed(1)}h`
+            } else {
+                const nextStart = start + 24
+                const waitTime = nextStart - currentUTC
+                return `Starts in ${waitTime.toFixed(1)}h`
+            }
+        case 'london':
+            // London session: 08:00 - 17:00 UTC
+            start = 8
+            end = 17
+            if (currentUTC >= start && currentUTC < end) {
+                const remaining = end - currentUTC
+                return `Active (${remaining.toFixed(1)}h left)`
+            } else if (currentUTC < start) {
+                const waitTime = start - currentUTC
+                return `Starts in ${waitTime.toFixed(1)}h`
+            } else {
+                const nextStart = start + 24
+                const waitTime = nextStart - currentUTC
+                return `Starts in ${waitTime.toFixed(1)}h`
+            }
+        case 'newyork':
+            // New York session: 13:00 - 22:00 UTC (EST/EDT)
+            start = 13
+            end = 22
+            if (currentUTC >= start && currentUTC < end) {
+                const remaining = end - currentUTC
+                return `Active (${remaining.toFixed(1)}h left)`
+            } else if (currentUTC < start) {
+                const waitTime = start - currentUTC
+                return `Starts in ${waitTime.toFixed(1)}h`
+            } else {
+                const nextStart = start + 24
+                const waitTime = nextStart - currentUTC
+                return `Starts in ${waitTime.toFixed(1)}h`
+            }
+        default:
+            return 'Closed'
+    }
+}
+
+// Check if session is active
+const isSessionActive = (session) => {
+    const now = currentDateTime.value
+    const utcHour = now.getUTCHours()
+    const utcMinute = now.getUTCMinutes()
+    const currentUTC = utcHour + utcMinute / 60
+    
+    switch(session) {
+        case 'asia':
+            return currentUTC >= 0 && currentUTC < 9
+        case 'london':
+            return currentUTC >= 8 && currentUTC < 17
+        case 'newyork':
+            return currentUTC >= 13 && currentUTC < 22
+        default:
+            return false
+    }
+}
 
 // Compute current page title for mobile
 const currentPageTitle = computed(() => {
@@ -210,6 +346,11 @@ const handleLogout = () => {
     // Stop polling
     if (pollingInterval) {
         clearInterval(pollingInterval)
+    }
+    
+    // Stop datetime interval
+    if (datetimeInterval) {
+        clearInterval(datetimeInterval)
     }
     
     // Redirect to login page
@@ -373,6 +514,11 @@ onMounted(() => {
         }
     }
 
+    // Start datetime interval
+    datetimeInterval = setInterval(() => {
+        currentDateTime.value = new Date()
+    }, 1000)
+
     // Start notification polling
     startPolling()
 
@@ -401,6 +547,11 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+    // Clean up datetime interval
+    if (datetimeInterval) {
+        clearInterval(datetimeInterval)
+    }
+    
     // Clean up polling interval
     if (pollingInterval) {
         clearInterval(pollingInterval)

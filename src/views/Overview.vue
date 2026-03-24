@@ -201,7 +201,7 @@
                   <span class="tx-type" :class="tx.type.toLowerCase()">{{ tx.type }}</span>
                 </div>
                 <span class="tx-amount" :class="tx.type.toLowerCase()">
-                  ¢{{ (tx.pnl) }}
+                  ¢{{ formatMoney((tx.pnl)) }}
                 </span>
               </div>
             </div>
