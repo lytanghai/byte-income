@@ -24,7 +24,7 @@
         <div class="stat-card">
           <span class="stat-label">Total P&L</span>
           <span class="stat-value" :class="getPnLClass(monthlyStats.totalPnL)">
-            ${{ (monthlyStats.totalPnL / 100).toFixed(2) }}
+            ${{ formatMoney((monthlyStats.totalPnL / 100).toFixed(2)) }}
           </span>
         </div>
         <div class="stat-card">
@@ -37,11 +37,11 @@
         </div>
         <div class="stat-card">
           <span class="stat-label">Best Day</span>
-          <span class="stat-value profit">${{ (monthlyStats.bestDay / 100).toFixed(2) }}</span>
+          <span class="stat-value profit">${{ formatMoney((monthlyStats.bestDay / 100).toFixed(2)) }}</span>
         </div>
         <div class="stat-card">
           <span class="stat-label">Worst Day</span>
-          <span class="stat-value loss">${{ (monthlyStats.worstDay / 100).toFixed(2) }}</span>
+          <span class="stat-value loss">${{ formatMoney((monthlyStats.worstDay / 100).toFixed(2)) }}</span>
         </div>
       </div>
     </div>
@@ -135,7 +135,7 @@
             @click="selectDay(day)"
           >
             <span class="day-number">{{ day.day }}</span>
-            <span class="day-pnl">{{ '¢' + day.pnl }}</span>
+            <span class="day-pnl">¢{{ formatMoney(day.pnl) }}</span>
           </div>
         </div>
 
@@ -144,11 +144,11 @@
           <div class="mobile-stats-grid">
             <div class="mobile-stat-item">
               <span class="mobile-stat-label">Best Day</span>
-              <span class="mobile-stat-value profit">{{'¢' + monthlyStats.bestDay.toFixed(2) }}</span>
+              <span class="mobile-stat-value profit">¢{{formatMoney(monthlyStats.bestDay.toFixed(2)) }}</span>
             </div>
             <div class="mobile-stat-item">
               <span class="mobile-stat-label">Worst Day</span>
-              <span class="mobile-stat-value loss">{{'¢' + monthlyStats.worstDay.toFixed(2) }}</span>
+              <span class="mobile-stat-value loss">¢{{ formatMoney(monthlyStats.worstDay.toFixed(2)) }}</span>
             </div>
           </div>
         </div>
@@ -274,6 +274,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useNotification } from '../composables/useNotification'
 import { useCache } from '../composables/useCache'
+import { formatMoney } from '../services/util'
 
 const { setCache, getCache } = useCache()
 
@@ -693,7 +694,7 @@ const formatTransactionAmount = (transaction) => {
   const amount = transaction.amount || transaction.pnl || transaction.value || 0
   
   if (transaction.type === 'PROFIT' || transaction.type === 'LOSS') {
-    return '¢' + amount
+    return '¢' + formatMoney(amount)
   }
   
   return ` ${formatCurrency(amount)}`

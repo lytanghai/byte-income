@@ -82,7 +82,7 @@
         <div class="card-icon profit">📊</div>
         <div class="card-content">
           <span class="card-label">Total Profit</span>
-          <span class="card-value profit">${{ (summary.totalProfit / 100).toFixed(2) }}</span>
+          <span class="card-value profit">${{ formatMoney((summary.totalProfit / 100).toFixed(2)) }}</span>
         </div>
       </div>
 
@@ -90,7 +90,7 @@
         <div class="card-icon loss">📉</div>
         <div class="card-content">
           <span class="card-label">Total Loss</span>
-          <span class="card-value loss">${{ (summary.totalLoss / 100).toFixed(2) }}</span>
+          <span class="card-value loss">${{ formatMoney((summary.totalLoss / 100).toFixed(2)) }}</span>
         </div>
       </div>
 
@@ -99,7 +99,7 @@
         <div class="card-content">
           <span class="card-label">Net P&L</span>
           <span class="card-value" :class="getProfitClass(summary.netPnL)">
-            ${{ (summary.netPnL / 100).toFixed(2) }}
+            ${{ formatMoney((summary.netPnL / 100).toFixed(2)) }}
           </span>
         </div>
       </div>
@@ -152,7 +152,7 @@
                   </span>
                 </td>
                 <td :class="getAmountClass(transaction)">
-                  {{ formatTransactionAmount(transaction) }}
+                  {{ formatMoney(formatTransactionAmount(transaction)) }}
                 </td>
                 <td>{{ transaction.currency }} ({{ transaction.currency === 'USD' ? '$' : '¢' }})</td>
                 <td class="date-cell">{{ formatDate(transaction.date) }}</td>
@@ -454,6 +454,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useNotification } from '../composables/useNotification'
 import { useCache } from '../composables/useCache'
+import { formatMoney } from '../services/util'
 
 const { setCache, getCache } = useCache()
 

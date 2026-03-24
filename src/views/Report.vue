@@ -348,6 +348,7 @@
 import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
 import { useNotification } from '../composables/useNotification'
 import Chart from 'chart.js/auto'
+import { formatMoney } from '../services/util'
 
 // Initialize notification
 const notification = useNotification()
