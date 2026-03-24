@@ -81,6 +81,14 @@
                     <h2 class="page-title mobile-only">{{ currentPageTitle }}</h2>
                 </div>
 
+                <!-- Quote Display - Center -->
+                <div class="header-center">
+                    <div class="quote-container" :class="{ 'quote-fade': isQuoteChanging }">
+                        <span class="quote-icon">💡</span>
+                        <span class="quote-text">{{ currentQuote }}</span>
+                    </div>
+                </div>
+
                 <div class="header-right">
                     <!-- Notification Bell (Mobile) -->
                     <button class="notification-bell mobile-only" @click="goToMarket">
@@ -135,17 +143,17 @@
                         <div class="session" :class="{ active: isSessionActive('asia') }">
                             <span class="session-icon">🌏</span>
                             <span class="session-name">Asia</span>
-                            <span class="session-status">{{ getSessionStatus('asia') }}</span>
+                            <span class="session-status">{{ getSessionCountdown('asia') }}</span>
                         </div>
                         <div class="session" :class="{ active: isSessionActive('london') }">
                             <span class="session-icon">🇬🇧</span>
                             <span class="session-name">London</span>
-                            <span class="session-status">{{ getSessionStatus('london') }}</span>
+                            <span class="session-status">{{ getSessionCountdown('london') }}</span>
                         </div>
                         <div class="session" :class="{ active: isSessionActive('newyork') }">
                             <span class="session-icon">🇺🇸</span>
                             <span class="session-name">New York</span>
-                            <span class="session-status">{{ getSessionStatus('newyork') }}</span>
+                            <span class="session-status">{{ getSessionCountdown('newyork') }}</span>
                         </div>
                     </div>
                 </div>
@@ -157,7 +165,7 @@
 </template>
 
 <style scoped>
-    @import '../assets/styles/dashboard.css';
+  @import '../assets/styles/dashboard.css';
 </style>
 
 <script setup>
@@ -167,7 +175,7 @@ import { useRouter, useRoute } from 'vue-router'
 const router = useRouter()
 const route = useRoute()
 const isSidebarOpen = ref(false)
-const theme = ref('light')
+const theme = ref('dark')
 const settingOpen = ref(false)
 const username = ref('')
 const isMobileProfileOpen = ref(false)
@@ -176,10 +184,91 @@ const isMobileProfileOpen = ref(false)
 const currentDateTime = ref(new Date())
 let datetimeInterval = null
 
-// Notification state
-const unreadCount = ref(0)
-const notifications = ref([])
-let pollingInterval = null
+// Quote state
+const quotes = [
+    "Follow the plan, follow the market"
+]
+
+const currentQuote = ref(quotes[0])
+const isQuoteChanging = ref(false)
+let quoteInterval = null
+
+// Helper function to format countdown
+const formatCountdown = (totalMinutes) => {
+    if (totalMinutes <= 0) return 'Closed'
+    
+    const hours = Math.floor(totalMinutes / 60)
+    const minutes = Math.floor(totalMinutes % 60)
+    
+    if (hours > 0) {
+        return `${hours}h ${minutes}m left`
+    } else {
+        return `${minutes}m left`
+    }
+}
+
+// Get countdown for each session
+const getSessionCountdown = (session) => {
+    const now = currentDateTime.value
+    const utcHour = now.getUTCHours()
+    const utcMinute = now.getUTCMinutes()
+    const currentUTC = utcHour + utcMinute / 60
+    
+    let start, end
+    
+    switch(session) {
+        case 'asia':
+            start = 0
+            end = 9
+            break
+        case 'london':
+            start = 8
+            end = 17
+            break
+        case 'newyork':
+            start = 13
+            end = 22
+            break
+        default:
+            return 'Closed'
+    }
+    
+    // Check if currently in session
+    if (currentUTC >= start && currentUTC < end) {
+        const remainingMinutes = (end - currentUTC) * 60
+        return formatCountdown(remainingMinutes)
+    } 
+    // Check if before session starts today
+    else if (currentUTC < start) {
+        const waitMinutes = (start - currentUTC) * 60
+        return `Starts in ${formatCountdown(waitMinutes)}`
+    } 
+    // After session ends, wait until next day
+    else {
+        const nextStart = start + 24
+        const waitMinutes = (nextStart - currentUTC) * 60
+        return `Starts in ${formatCountdown(waitMinutes)}`
+    }
+}
+
+// Change quote every 10 seconds
+const changeQuote = () => {
+    isQuoteChanging.value = true
+    
+    // Get random quote different from current
+    let newQuote = currentQuote.value
+    while (newQuote === currentQuote.value && quotes.length > 1) {
+        const randomIndex = Math.floor(Math.random() * quotes.length)
+        newQuote = quotes[randomIndex]
+    }
+    
+    setTimeout(() => {
+        currentQuote.value = newQuote
+        setTimeout(() => {
+            isQuoteChanging.value = false
+        }, 500)
+    }, 250)
+}
 
 // Compute current date
 const currentDate = computed(() => {
@@ -215,66 +304,6 @@ const currentTimeIcon = computed(() => {
         return '🌙' // Night
     }
 })
-
-// Trading session times (UTC)
-const getSessionStatus = (session) => {
-    const now = currentDateTime.value
-    const utcHour = now.getUTCHours()
-    const utcMinute = now.getUTCMinutes()
-    const currentUTC = utcHour + utcMinute / 60
-    
-    let start, end
-    
-    switch(session) {
-        case 'asia':
-            // Asia session: 00:00 - 09:00 UTC (Tokyo, Sydney, Hong Kong)
-            start = 0
-            end = 9
-            if (currentUTC >= start && currentUTC < end) {
-                const remaining = end - currentUTC
-                return `Active (${remaining.toFixed(1)}h left)`
-            } else if (currentUTC < start) {
-                const waitTime = start - currentUTC
-                return `Starts in ${waitTime.toFixed(1)}h`
-            } else {
-                const nextStart = start + 24
-                const waitTime = nextStart - currentUTC
-                return `Starts in ${waitTime.toFixed(1)}h`
-            }
-        case 'london':
-            // London session: 08:00 - 17:00 UTC
-            start = 8
-            end = 17
-            if (currentUTC >= start && currentUTC < end) {
-                const remaining = end - currentUTC
-                return `Active (${remaining.toFixed(1)}h left)`
-            } else if (currentUTC < start) {
-                const waitTime = start - currentUTC
-                return `Starts in ${waitTime.toFixed(1)}h`
-            } else {
-                const nextStart = start + 24
-                const waitTime = nextStart - currentUTC
-                return `Starts in ${waitTime.toFixed(1)}h`
-            }
-        case 'newyork':
-            // New York session: 13:00 - 22:00 UTC (EST/EDT)
-            start = 13
-            end = 22
-            if (currentUTC >= start && currentUTC < end) {
-                const remaining = end - currentUTC
-                return `Active (${remaining.toFixed(1)}h left)`
-            } else if (currentUTC < start) {
-                const waitTime = start - currentUTC
-                return `Starts in ${waitTime.toFixed(1)}h`
-            } else {
-                const nextStart = start + 24
-                const waitTime = nextStart - currentUTC
-                return `Starts in ${waitTime.toFixed(1)}h`
-            }
-        default:
-            return 'Closed'
-    }
-}
 
 // Check if session is active
 const isSessionActive = (session) => {
@@ -340,7 +369,7 @@ const handleLogout = () => {
     localStorage.removeItem('isAuthenticated')
     localStorage.removeItem('rememberMe')
     localStorage.removeItem('userData')
-    localStorage.removeItem('notification_cache') // Clear notification cache
+    localStorage.removeItem('notification_cache')
     localStorage.removeItem('notification_timestamp')
     
     // Stop polling
@@ -351,6 +380,11 @@ const handleLogout = () => {
     // Stop datetime interval
     if (datetimeInterval) {
         clearInterval(datetimeInterval)
+    }
+    
+    // Stop quote interval
+    if (quoteInterval) {
+        clearInterval(quoteInterval)
     }
     
     // Redirect to login page
@@ -519,6 +553,11 @@ onMounted(() => {
         currentDateTime.value = new Date()
     }, 1000)
 
+    // Start quote interval (10 seconds)
+    quoteInterval = setInterval(() => {
+        changeQuote()
+    }, 10000)
+
     // Start notification polling
     startPolling()
 
@@ -550,6 +589,11 @@ onUnmounted(() => {
     // Clean up datetime interval
     if (datetimeInterval) {
         clearInterval(datetimeInterval)
+    }
+    
+    // Clean up quote interval
+    if (quoteInterval) {
+        clearInterval(quoteInterval)
     }
     
     // Clean up polling interval
