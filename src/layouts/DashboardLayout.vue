@@ -22,6 +22,9 @@
                     <RouterLink @click="closeSidebar" to="/insight">
                         <span class="menu-text">Insight</span>
                     </RouterLink>
+                    <RouterLink @click="closeSidebar" to="/chart">
+                        <span class="menu-text">Chart</span>
+                    </RouterLink>
                     <!-- <RouterLink @click="closeSidebar" to="/market" class="notification-link">
                         <span class="menu-text">Market</span>
                         <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount }}</span>
