@@ -1,40 +1,47 @@
 <template>
-  <div class="tradingview-container">
-    <div class="symbol-tabs">
-      <button 
-        v-for="symbol in symbols" 
-        :key="symbol.id"
-        :class="['tab-btn', { active: activeSymbol === symbol.id }]"
-        @click="changeSymbol(symbol.id)"
-      >
-        <span class="symbol-icon">{{ symbol.icon }}</span>
-        <span class="symbol-name">{{ symbol.name }}</span>
-        <span class="symbol-code">{{ symbol.code }}</span>
-      </button>
+  <div class="tradingview-page">
+    <div class="page-header">
+      <h1 class="page-title">Market Charts</h1>
+      <p class="page-description">Real-time charts for major trading instruments</p>
     </div>
-    
-    <div class="chart-container">
-      <div 
-        v-for="symbol in symbols" 
-        :key="symbol.id"
-        :id="`tv-widget-${symbol.id}`"
-        class="tv-widget"
-        :class="{ active: activeSymbol === symbol.id }"
-      ></div>
-    </div>
-    
-    <div class="chart-info">
-      <div class="info-item">
-        <span class="info-label">Data Source:</span>
-        <span class="info-value">TradingView</span>
+
+    <div class="tradingview-container">
+      <div class="symbol-tabs">
+        <button 
+          v-for="symbol in symbols" 
+          :key="symbol.id"
+          :class="['tab-btn', { active: activeSymbol === symbol.id }]"
+          @click="changeSymbol(symbol.id)"
+        >
+          <span class="symbol-icon">{{ symbol.icon }}</span>
+          <span class="symbol-name">{{ symbol.name }}</span>
+          <span class="symbol-code">{{ symbol.code }}</span>
+        </button>
       </div>
-      <div class="info-item">
-        <span class="info-label">Real-time:</span>
-        <span class="info-value">Delayed by exchange</span>
+      
+      <div class="chart-container">
+        <div 
+          v-for="symbol in symbols" 
+          :key="symbol.id"
+          :id="`tv-widget-${symbol.id}`"
+          class="tv-widget"
+          :class="{ active: activeSymbol === symbol.id }"
+        ></div>
       </div>
-      <div class="info-item">
-        <span class="info-label">Time Zone:</span>
-        <span class="info-value">UTC</span>
+      
+      <div class="chart-info">
+        <div class="info-item">
+          <span class="info-label">Data Source:</span>
+          <span class="info-value">TradingView</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Real-time:</span>
+          <span class="info-value">Delayed by exchange</span>
+        </div>
+        <div class="info-item">
+          <span class="info-label">Time Zone:</span>
+          <span class="info-value">UTC</span>
+        </div>
       </div>
     </div>
   </div>
@@ -43,7 +50,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 
-// Symbol definitions
+// Symbol definitions with correct TradingView symbols
 const symbols = ref([
   {
     id: 'xauusd',
@@ -73,15 +80,16 @@ const symbols = ref([
 
 const activeSymbol = ref('xauusd')
 let widgets = ref({})
-let resizeObserver = null
+let currentTheme = ref('light')
 
-// Theme detection
-const getTheme = () => {
+// Get current theme
+const getCurrentTheme = () => {
   const theme = localStorage.getItem('theme') || 'light'
+  currentTheme.value = theme
   return theme === 'dark' ? 'dark' : 'light'
 }
 
-// Create widget for a symbol
+// Create widget using TradingView's widget constructor
 const createWidget = (symbolId) => {
   const symbol = symbols.value.find(s => s.id === symbolId)
   if (!symbol) return
@@ -99,50 +107,77 @@ const createWidget = (symbolId) => {
   widgetContainer.style.height = '100%'
   container.appendChild(widgetContainer)
   
-  // Create script element
-  const script = document.createElement('script')
-  script.type = 'text/javascript'
-  script.src = 'https://s3.tradingview.com/tv.js'
-  script.async = true
+  // Check if TradingView is already loaded
+  if (window.TradingView) {
+    initWidget(symbolId, widgetContainer.id, symbol.tradingViewSymbol)
+  } else {
+    // Load TradingView widget library
+    const script = document.createElement('script')
+    script.type = 'text/javascript'
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js'
+    script.async = true
+    
+    script.onload = () => {
+      initWidget(symbolId, widgetContainer.id, symbol.tradingViewSymbol)
+    }
+    
+    script.onerror = () => {
+      console.error('Failed to load TradingView script')
+      container.innerHTML = '<div class="error-message">Failed to load chart. Please check your internet connection.</div>'
+    }
+    
+    document.head.appendChild(script)
+  }
+}
+
+// Initialize widget with proper configuration
+const initWidget = (symbolId, containerId, tradingViewSymbol) => {
+  const theme = getCurrentTheme()
   
-  script.onload = () => {
-    if (window.TradingView) {
-      try {
-        const widget = new window.TradingView.widget({
-          width: '100%',
-          height: '100%',
-          symbol: symbol.tradingViewSymbol,
-          interval: '60',
-          timezone: 'Etc/UTC',
-          theme: getTheme(),
-          style: '1',
-          locale: 'en',
-          toolbar_bg: '#f1f3f6',
-          enable_publishing: false,
-          allow_symbol_change: false,
-          container_id: `tv-chart-${symbolId}`,
-          hide_top_toolbar: false,
-          hide_side_toolbar: false,
-          studies: ['MASimple@tv-basicstudies', 'RSI@tv-basicstudies'],
-          save_image: false,
-          autosize: true
-        })
-        
-        widgets.value[symbolId] = widget
-      } catch (error) {
-        console.error(`Error creating widget for ${symbol.code}:`, error)
-      }
-    } else {
-      console.error('TradingView library not loaded')
+  // Create widget configuration
+  const widgetConfig = {
+    width: '100%',
+    height: '100%',
+    symbol: tradingViewSymbol,
+    interval: '60',
+    timezone: 'Etc/UTC',
+    theme: theme,
+    style: '1',
+    locale: 'en',
+    toolbar_bg: theme === 'dark' ? '#1e293b' : '#f1f3f6',
+    enable_publishing: false,
+    allow_symbol_change: true,
+    container_id: containerId,
+    hide_top_toolbar: false,
+    hide_side_toolbar: false,
+    studies: [
+      "MASimple@tv-basicstudies",
+      "RSI@tv-basicstudies",
+      "Volume@tv-basicstudies"
+    ],
+    save_image: false,
+    autosize: true
+  }
+  
+  // Create the widget
+  try {
+    const widget = new TradingView.widget(widgetConfig)
+    widgets.value[symbolId] = widget
+    
+    // Store the widget for potential future updates
+    if (!window.tradingViewWidgets) {
+      window.tradingViewWidgets = {}
+    }
+    window.tradingViewWidgets[symbolId] = widget
+    
+    console.log(`Widget created for ${symbolId}`)
+  } catch (error) {
+    console.error(`Error creating widget for ${symbolId}:`, error)
+    const container = document.getElementById(`tv-widget-${symbolId}`)
+    if (container) {
+      container.innerHTML = '<div class="error-message">Error loading chart. Please refresh the page.</div>'
     }
   }
-  
-  script.onerror = () => {
-    console.error('Failed to load TradingView script')
-    container.innerHTML = '<div class="error-message">Failed to load chart. Please check your internet connection and try again.</div>'
-  }
-  
-  document.head.appendChild(script)
 }
 
 // Change active symbol
@@ -157,58 +192,37 @@ const changeSymbol = (symbolId) => {
   }
 }
 
-// Refresh widget theme
-const refreshWidgetTheme = () => {
-  const currentTheme = getTheme()
+// Update widget theme when theme changes
+const updateWidgetTheme = () => {
+  const newTheme = getCurrentTheme()
+  
   Object.keys(widgets.value).forEach(symbolId => {
-    if (widgets.value[symbolId]) {
+    const widget = widgets.value[symbolId]
+    if (widget && widget.setTheme) {
       try {
-        // TradingView widgets have a method to change theme
-        if (widgets.value[symbolId].setTheme) {
-          widgets.value[symbolId].setTheme(currentTheme)
-        } else {
-          // If direct method doesn't exist, recreate the widget
-          const container = document.getElementById(`tv-widget-${symbolId}`)
-          if (container && activeSymbol.value === symbolId) {
-            container.innerHTML = ''
-            widgets.value[symbolId] = null
-            createWidget(symbolId)
-          }
-        }
+        widget.setTheme(newTheme)
       } catch (error) {
-        console.error('Error refreshing theme:', error)
-      }
-    }
-  })
-}
-
-// Handle window resize
-const handleResize = () => {
-  Object.keys(widgets.value).forEach(symbolId => {
-    if (widgets.value[symbolId] && widgets.value[symbolId].resize) {
-      try {
-        widgets.value[symbolId].resize()
-      } catch (error) {
-        console.error('Error resizing widget:', error)
+        console.error('Error updating widget theme:', error)
       }
     }
   })
 }
 
 // Watch for theme changes in localStorage
-const watchThemeChanges = () => {
-  const originalSetItem = localStorage.setItem
-  localStorage.setItem = function(key, value) {
-    const event = new Event('storage')
-    event.key = key
-    event.newValue = value
-    window.dispatchEvent(event)
-    originalSetItem.apply(this, arguments)
-  }
-  
-  window.addEventListener('storage', (e) => {
-    if (e.key === 'theme') {
-      refreshWidgetTheme()
+watch(() => localStorage.getItem('theme'), () => {
+  updateWidgetTheme()
+})
+
+// Handle window resize
+const handleResize = () => {
+  Object.keys(widgets.value).forEach(symbolId => {
+    const widget = widgets.value[symbolId]
+    if (widget && widget.resize) {
+      try {
+        widget.resize()
+      } catch (error) {
+        console.error('Error resizing widget:', error)
+      }
     }
   })
 }
@@ -218,8 +232,8 @@ onMounted(() => {
   createWidget(activeSymbol.value)
   
   // Set up resize observer
-  resizeObserver = new ResizeObserver(() => {
-    handleResize()
+  const resizeObserver = new ResizeObserver(() => {
+    setTimeout(handleResize, 100)
   })
   
   const container = document.querySelector('.chart-container')
@@ -227,44 +241,63 @@ onMounted(() => {
     resizeObserver.observe(container)
   }
   
-  // Watch for theme changes
-  watchThemeChanges()
-  
   // Handle window resize
   window.addEventListener('resize', handleResize)
-})
-
-onUnmounted(() => {
-  // Clean up widgets
-  Object.keys(widgets.value).forEach(symbolId => {
-    if (widgets.value[symbolId] && widgets.value[symbolId].destroy) {
-      try {
-        widgets.value[symbolId].destroy()
-      } catch (error) {
-        console.error('Error destroying widget:', error)
-      }
-    }
-  })
   
-  // Clean up resize observer
-  if (resizeObserver) {
+  // Clean up on unmount
+  onUnmounted(() => {
     resizeObserver.disconnect()
-  }
-  
-  // Remove event listeners
-  window.removeEventListener('resize', handleResize)
+    window.removeEventListener('resize', handleResize)
+    
+    // Clean up widgets
+    Object.keys(widgets.value).forEach(symbolId => {
+      const widget = widgets.value[symbolId]
+      if (widget && widget.remove) {
+        try {
+          widget.remove()
+        } catch (error) {
+          console.error('Error removing widget:', error)
+        }
+      }
+    })
+  })
 })
 </script>
 
 <style scoped>
-.tradingview-container {
+.tradingview-page {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0 0 8px 0;
+}
+
+.page-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.tradingview-container {
+  flex: 1;
   display: flex;
   flex-direction: column;
   background: var(--bg-panel);
   border-radius: 12px;
   overflow: hidden;
+  min-height: 0;
+  border: 1px solid var(--border-color);
 }
 
 /* Symbol Tabs */
@@ -296,11 +329,11 @@ onUnmounted(() => {
 .tab-btn:hover {
   transform: translateY(-2px);
   background: var(--bg-hover);
-  border-color: var(--primary-color);
+  border-color: #38bdf8;
 }
 
 .tab-btn.active {
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
   color: white;
   border-color: transparent;
   box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
@@ -395,8 +428,6 @@ onUnmounted(() => {
   --bg-header: #f8fafc;
   --border-color: #e2e8f0;
   --bg-hover: #f1f5f9;
-  --primary-color: #38bdf8;
-  --primary-dark: #0ea5e9;
   --text-main: #0f172a;
   --text-secondary: #64748b;
 }
@@ -406,14 +437,24 @@ onUnmounted(() => {
   --bg-header: #0f172a;
   --border-color: #334155;
   --bg-hover: #334155;
-  --primary-color: #38bdf8;
-  --primary-dark: #0ea5e9;
   --text-main: #e2e8f0;
   --text-secondary: #94a3b8;
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
+  .page-header {
+    margin-bottom: 16px;
+  }
+  
+  .page-title {
+    font-size: 1.25rem;
+  }
+  
+  .page-description {
+    font-size: 0.75rem;
+  }
+  
   .symbol-tabs {
     padding: 12px 16px;
     gap: 6px;
@@ -452,46 +493,8 @@ onUnmounted(() => {
 }
 
 @media (max-width: 480px) {
-  .symbol-tabs {
-    padding: 10px 12px;
-  }
-  
-  .tab-btn {
-    padding: 5px 10px;
-    gap: 4px;
-  }
-  
-  .symbol-icon {
-    font-size: 12px;
-  }
-  
-  .symbol-code {
-    font-size: 10px;
-  }
-  
   .chart-container {
     min-height: 350px;
-  }
-  
-  .chart-info {
-    padding: 6px 12px;
-    gap: 12px;
-    font-size: 9px;
-  }
-}
-
-/* Landscape Mode */
-@media (max-width: 768px) and (orientation: landscape) {
-  .chart-container {
-    min-height: 300px;
-  }
-  
-  .symbol-tabs {
-    padding: 8px 12px;
-  }
-  
-  .tab-btn {
-    padding: 4px 8px;
   }
 }
 
@@ -508,6 +511,10 @@ onUnmounted(() => {
 
 /* Large Screens */
 @media (min-width: 1440px) {
+  .page-title {
+    font-size: 2rem;
+  }
+  
   .symbol-tabs {
     padding: 20px 24px;
   }
@@ -521,17 +528,8 @@ onUnmounted(() => {
     font-size: 20px;
   }
   
-  .symbol-code {
-    font-size: 14px;
-  }
-  
   .chart-container {
     min-height: 600px;
-  }
-  
-  .chart-info {
-    padding: 16px 24px;
-    font-size: 14px;
   }
 }
 </style>
