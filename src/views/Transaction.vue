@@ -303,13 +303,6 @@
             </div>
           </div>
 
-          <!-- Lot Size Field (only for PROFIT/LOSS) -->
-          <div v-if="isTradingType" class="form-group">
-            <label for="lot_size">Lot Size</label>
-            <input type="number" id="lot_size" v-model="form.lot_size" step="0.01" min="0" class="form-input"
-              placeholder="0.01" />
-          </div>
-
           <!-- Amount Field -->
           <div class="form-group">
             <label for="pnl">{{ amountLabel }} *</label>
@@ -499,7 +492,6 @@ const form = reactive({
   sn: null,
   symbol: '',
   type: '',
-  lot_size: '',
   pnl: '',
   currency: '',
   date: ''
@@ -595,7 +587,6 @@ const groupedByDate = computed(() => {
 // Handle type change
 const handleTypeChange = () => {
   if (!isTradingType.value) {
-    form.lot_size = ''
     form.symbol = ''
   }
 }
@@ -756,15 +747,9 @@ const createTransaction = async () => {
   try {
     const token = getAuthToken()
 
-    // Set default lot_size to 0.01 if not provided or if it's empty
-    const lotSize = form.lot_size && !isNaN(parseFloat(form.lot_size))
-      ? parseFloat(form.lot_size)
-      : 0.01
-
     const payload = {
       symbol: form.symbol || '', // Include symbol (required)
       currency: form.currency,    // Required
-      lot_size: lotSize,          // Required with default 0.01
       pnl: parseFloat(form.pnl),  // Required
       type: form.type.toLowerCase() // Required
     }
@@ -823,7 +808,6 @@ const updateTransaction = async () => {
 
     const payload = { sn: form.sn }
     if (form.symbol) payload.symbol = form.symbol
-    if (form.lot_size) payload.lot_size = parseFloat(form.lot_size).toString()
     if (form.currency) payload.currency = form.currency
     if (form.pnl) payload.pnl = parseFloat(form.pnl)
 
@@ -1121,7 +1105,6 @@ const openCreateModal = () => {
   form.sn = null
   form.symbol = ''
   form.type = ''
-  form.lot_size = ''
   form.pnl = ''
   form.currency = ''
   form.date = ''
@@ -1134,7 +1117,6 @@ const openEditModal = (transaction) => {
   form.sn = transaction.sn
   form.symbol = transaction.symbol || ''
   form.type = transaction.type
-  form.lot_size = transaction.lot_size || ''
   form.pnl = transaction.pnl
   form.currency = transaction.currency
   form.date = formatDateForInput(transaction.date)
@@ -1151,7 +1133,6 @@ const closeModal = () => {
   form.sn = null
   form.symbol = ''
   form.type = ''
-  form.lot_size = ''
   form.pnl = ''
   form.currency = ''
   form.date = ''

@@ -145,6 +145,15 @@
 
         <!-- Tab Navigation -->
         <div class="tab-navigation">
+
+          <button 
+            class="tab-btn" 
+            :class="{ active: activeTab === 'events'}"
+            @click="activeTab = 'events'"
+          >
+            Forex Factory Calendar
+          </button>
+
           <button 
             class="tab-btn" 
             :class="{ active: activeTab === 'news' }"
@@ -152,13 +161,7 @@
           >
             News Feed
           </button>
-          <button 
-            class="tab-btn" 
-            :class="{ active: activeTab === 'events' }"
-            @click="activeTab = 'events'"
-          >
-            Forex Factory Calendar
-          </button>
+          
         </div>
 
         <!-- News Feed Tab -->
@@ -344,7 +347,7 @@ const error = ref(null)
 const eventsError = ref(null)
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
-const activeTab = ref('news')
+const activeTab = ref('events')
 const currentTime = ref(new Date())
 const hasSearched = ref(false)
 let timerInterval = null
@@ -525,7 +528,7 @@ const getCountdown = (dateTime) => {
   
   // If event already passed
   if (eventDate < now) {
-    return 'Over'
+    return 'Ended'
   }
   
   const diffMs = eventDate - now
