@@ -11,10 +11,8 @@ import Report from '../views/Report.vue'
 import Users from '../views/Users.vue'
 import Cache from '../views/Cache.vue'
 import Configuration from '../views/Configuration.vue'
-import Chart from '../views/Chart.vue'
 
 // Import the token check function
-import { checkAuthBeforeRoute } from '../services/api';
 import Calculator from '../views/Calculator.vue'
 
 const routes = [
@@ -35,7 +33,6 @@ const routes = [
       { path: 'transaction', name: 'Transaction', component: Transaction },
       { path: 'performance', name: 'Performance', component: Performance },
       { path: 'insight', name: 'Insight', component: Insight },
-      { path: 'chart', name: 'Chart', component: Chart },
       { path: 'market', name: 'Market', component: Market },
       { path: 'report', name: 'Report', component: Report },
       { path: 'calculator', name: 'Calculator', component: Calculator},

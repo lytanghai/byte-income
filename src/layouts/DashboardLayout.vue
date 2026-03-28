@@ -22,9 +22,6 @@
                     <RouterLink @click="closeSidebar" to="/insight">
                         <span class="menu-text">Insight</span>
                     </RouterLink>
-                    <RouterLink @click="closeSidebar" to="/chart">
-                        <span class="menu-text">Chart</span>
-                    </RouterLink>
                     <!-- <RouterLink @click="closeSidebar" to="/market" class="notification-link">
                         <span class="menu-text">Market</span>
                         <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount }}</span>
@@ -94,10 +91,10 @@
 
                 <div class="header-right">
                     <!-- Notification Bell (Mobile) -->
-                    <button class="notification-bell mobile-only" @click="goToMarket">
+                    <!-- <button class="notification-bell mobile-only" @click="goToMarket">
                         <span class="bell-icon">🔔</span>
                         <span v-if="unreadCount > 0" class="bell-badge">{{ unreadCount }}</span>
-                    </button>
+                    </button> -->
 
                     <!-- Theme toggle -->
                     <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
