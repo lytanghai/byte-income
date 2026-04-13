@@ -313,7 +313,7 @@ const notification = useNotification()
 
 // API Base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
-const API_TRENDING_URL = import.meta.env.API_BASE_URL
+const API_TRENDING_URL = import.meta.env.VITE_API_TRENDING_BASE_URL
 
 // Cache keys for localStorage
 const NEWS_CACHE_KEY = 'insight_news_cache'
