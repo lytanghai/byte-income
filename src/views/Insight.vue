@@ -65,25 +65,31 @@
         <div class="filter-group">
           <label class="filter-label">Keyword</label>
           <div class="keyword-search">
-            <input 
-              type="text" 
-              v-model="filters.keyword" 
-              @keyup.enter="handleSearch"
-              placeholder="Search in title..."
-              class="keyword-input"
-            />
+            <input type="text" v-model="filters.keyword" @keyup.enter="handleSearch" placeholder="Search in title..."
+              class="keyword-input" />
             <button v-if="filters.keyword" @click="clearKeyword" class="clear-btn">✕</button>
           </div>
           <!-- <small class="hint">If no category selected, keyword will be used as search term</small> -->
         </div>
 
+        <!-- Trending Keywords -->
+        <div class="trending-keywords" v-if="trendingKeywords.length > 0">
+          <div class="trending-title">
+            🔥 Trending Keywords
+          </div>
+
+          <div class="keyword-tags">
+            <span v-for="(item, index) in trendingKeywords" :key="index" class="keyword-tag"
+              @click="selectKeyword(item[0])">
+              {{ item[0] }} ({{ item[1] }})
+            </span>
+          </div>
+        </div>
+
         <!-- Search Button -->
         <div class="filter-group">
-          <button 
-            @click="handleSearch" 
-            class="btn-search" 
-            :disabled="(!filters.category && !filters.keyword) || newsLoading"
-          >
+          <button @click="handleSearch" class="btn-search"
+            :disabled="(!filters.category && !filters.keyword) || newsLoading">
             <span v-if="newsLoading" class="spinner-small"></span>
             <span class="btn-icon">🔍</span>
             {{ newsLoading ? 'Searching...' : 'Search News' }}
@@ -146,22 +152,14 @@
         <!-- Tab Navigation -->
         <div class="tab-navigation">
 
-          <button 
-            class="tab-btn" 
-            :class="{ active: activeTab === 'events'}"
-            @click="activeTab = 'events'"
-          >
+          <button class="tab-btn" :class="{ active: activeTab === 'events' }" @click="activeTab = 'events'">
             Forex Factory Calendar
           </button>
 
-          <button 
-            class="tab-btn" 
-            :class="{ active: activeTab === 'news' }"
-            @click="activeTab = 'news'"
-          >
+          <button class="tab-btn" :class="{ active: activeTab === 'news' }" @click="activeTab = 'news'">
             News Feed
           </button>
-          
+
         </div>
 
         <!-- News Feed Tab -->
@@ -195,11 +193,7 @@
               No news articles match your filters
             </div>
 
-            <div 
-              v-for="(item, index) in paginatedNews" 
-              :key="index" 
-              class="news-card"
-            >
+            <div v-for="(item, index) in paginatedNews" :key="index" class="news-card">
               <!-- Card Header -->
               <div class="news-header">
                 <div class="news-meta">
@@ -217,21 +211,13 @@
 
             <!-- Pagination -->
             <div class="pagination">
-              <button 
-                @click="currentPage--" 
-                :disabled="currentPage === 1"
-                class="pagination-btn"
-              >
+              <button @click="currentPage--" :disabled="currentPage === 1" class="pagination-btn">
                 ← Previous
               </button>
               <span class="page-info">
                 Page {{ currentPage }} of {{ totalPages }}
               </span>
-              <button 
-                @click="currentPage++" 
-                :disabled="currentPage === totalPages"
-                class="pagination-btn"
-              >
+              <button @click="currentPage++" :disabled="currentPage === totalPages" class="pagination-btn">
                 Next →
               </button>
             </div>
@@ -272,12 +258,8 @@
                 <span class="event-count">{{ group.length }} events</span>
               </div>
 
-              <div 
-                v-for="event in group" 
-                :key="event.date + event.title" 
-                class="event-card"
-                :class="getEventImpactClass(event.impact)"
-              >
+              <div v-for="event in group" :key="event.date + event.title" class="event-card"
+                :class="getEventImpactClass(event.impact)">
                 <div class="event-time">
                   {{ formatEventTime(event.date) }}
                   <!-- Countdown timer for today's events -->
@@ -331,6 +313,7 @@ const notification = useNotification()
 
 // API Base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+const API_TRENDING_URL = import.meta.env.API_BASE_URL
 
 // Cache keys for localStorage
 const NEWS_CACHE_KEY = 'insight_news_cache'
@@ -352,6 +335,10 @@ const currentTime = ref(new Date())
 const hasSearched = ref(false)
 let timerInterval = null
 
+//Keyword for news search
+const trendingKeywords = ref([])
+const keywordLoading = ref(false)
+
 // Filters
 const filters = reactive({
   category: '',
@@ -367,9 +354,6 @@ const sources = computed(() => {
 })
 
 // ============== VALIDATION ==============
-const isSearchValid = computed(() => {
-  return filters.category || (filters.keyword && filters.keyword.trim() !== '')
-})
 
 // ============== CACHE MANAGEMENT ==============
 const saveNewsToCache = (data) => {
@@ -394,16 +378,16 @@ const saveNewsToCache = (data) => {
 const loadNewsFromCache = () => {
   try {
     const cached = getCache(NEWS_CACHE_KEY)
-    
+
     if (cached) {
       const cacheData = JSON.parse(cached)
-      
+
       // Check if filters match
       if (cacheData.filters.category === filters.category &&
-          cacheData.filters.last_updated === filters.last_updated &&
-          cacheData.filters.source === filters.source &&
-          cacheData.filters.keyword === filters.keyword) {
-        
+        cacheData.filters.last_updated === filters.last_updated &&
+        cacheData.filters.source === filters.source &&
+        cacheData.filters.keyword === filters.keyword) {
+
         allNews.value = cacheData.data
         console.log('✅ News loaded from cache')
         return true
@@ -435,10 +419,10 @@ const saveEventsToCache = (data) => {
 const loadEventsFromCache = () => {
   try {
     const cached = getCache(EVENTS_CACHE_KEY)
-    
+
     if (cached) {
       const cacheData = JSON.parse(cached)
-      
+
       // Check if filters match
       if (cacheData.filters.keyword === filters.keyword) {
         events.value = cacheData.data
@@ -461,6 +445,7 @@ const startTimer = () => {
 
 onMounted(() => {
   fetchEvents()
+  fetchTrendingKeywords()
   startTimer()
 })
 
@@ -475,14 +460,14 @@ const filteredNews = computed(() => {
   return allNews.value.filter(item => {
     // Source filter
     if (filters.source && item.source !== filters.source) return false
-    
+
     // Keyword search (if keyword exists and we're not using it as category)
     if (filters.keyword && filters.category) {
       const keyword = filters.keyword.toLowerCase()
       const titleMatch = item.title?.toLowerCase().includes(keyword)
       if (!titleMatch) return false
     }
-    
+
     return true
   })
 })
@@ -496,7 +481,7 @@ const filteredEvents = computed(() => {
       const titleMatch = event.title?.toLowerCase().includes(keyword)
       if (!titleMatch) return false
     }
-    
+
     return true
   })
 })
@@ -514,27 +499,27 @@ const parseEventDate = (dateStr) => {
 const isToday = (dateStr) => {
   const today = new Date()
   const [day, month, year] = dateStr.split('-').map(Number)
-  return day === today.getDate() && 
-         month === today.getMonth() + 1 && 
-         year === today.getFullYear()
+  return day === today.getDate() &&
+    month === today.getMonth() + 1 &&
+    year === today.getFullYear()
 }
 
 // Get countdown time for event
 const getCountdown = (dateTime) => {
   if (!dateTime) return ''
-  
+
   const eventDate = parseEventDate(dateTime)
   const now = currentTime.value
-  
+
   // If event already passed
   if (eventDate < now) {
     return 'Ended'
   }
-  
+
   const diffMs = eventDate - now
   const diffHrs = Math.floor(diffMs / (1000 * 60 * 60))
   const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
-  
+
   if (diffHrs > 24) {
     const diffDays = Math.floor(diffHrs / 24)
     return `${diffDays}d ${diffHrs % 24}h`
@@ -551,7 +536,7 @@ const getCountdown = (dateTime) => {
 const sortedEventGroupsAsc = computed(() => {
   // First, group events by date
   const groups = {}
-  
+
   filteredEvents.value.forEach(event => {
     const date = event.date.split(' ')[0] // Get date part only
     if (!groups[date]) {
@@ -559,7 +544,7 @@ const sortedEventGroupsAsc = computed(() => {
     }
     groups[date].push(event)
   })
-  
+
   // Sort events within each date by time (ascending)
   Object.keys(groups).forEach(date => {
     groups[date].sort((a, b) => {
@@ -568,17 +553,17 @@ const sortedEventGroupsAsc = computed(() => {
       return timeA.localeCompare(timeB)
     })
   })
-  
+
   const now = currentTime.value
-  
+
   // Separate upcoming and past dates
   const upcomingDates = []
   const pastDates = []
-  
+
   Object.keys(groups).forEach(date => {
     const eventDate = parseEventDate(date + ' 00:00:00')
     const lastEventTime = parseEventDate(date + ' 23:59:59')
-    
+
     if (lastEventTime < now) {
       // All events on this date are in the past
       pastDates.push(date)
@@ -587,30 +572,30 @@ const sortedEventGroupsAsc = computed(() => {
       upcomingDates.push(date)
     }
   })
-  
+
   // Sort upcoming dates in ascending order (soonest first)
   upcomingDates.sort((a, b) => {
     const dateA = parseEventDate(a + ' 00:00:00')
     const dateB = parseEventDate(b + ' 00:00:00')
     return dateA - dateB
   })
-  
+
   // Sort past dates in descending order (most recent past first)
   pastDates.sort((a, b) => {
     const dateA = parseEventDate(a + ' 00:00:00')
     const dateB = parseEventDate(b + ' 00:00:00')
     return dateB - dateA
   })
-  
+
   // Combine: upcoming first, then past
   const sortedDates = [...upcomingDates, ...pastDates]
-  
+
   // Create new object with sorted dates
   const sortedGroups = {}
   sortedDates.forEach(date => {
     sortedGroups[date] = groups[date]
   })
-  
+
   return sortedGroups
 })
 
@@ -618,7 +603,7 @@ const sortedEventGroupsAsc = computed(() => {
 const todayEventsCount = computed(() => {
   const today = new Date()
   const todayStr = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`
-  
+
   return filteredEvents.value.filter(event => {
     const eventDate = event.date.split(' ')[0]
     return eventDate === todayStr
@@ -626,7 +611,7 @@ const todayEventsCount = computed(() => {
 })
 
 // Pagination
-const totalPages = computed(() => 
+const totalPages = computed(() =>
   Math.ceil(filteredNews.value.length / itemsPerPage.value)
 )
 
@@ -638,15 +623,15 @@ const paginatedNews = computed(() => {
 
 // Stats
 const totalNews = computed(() => allNews.value.length)
-const highImpactEvents = computed(() => 
+const highImpactEvents = computed(() =>
   filteredEvents.value.filter(e => e.impact === 'High').length
 )
 
 const hasActiveFilters = computed(() => {
-  return filters.category || 
-         filters.last_updated ||
-         filters.source ||
-         filters.keyword
+  return filters.category ||
+    filters.last_updated ||
+    filters.source ||
+    filters.keyword
 })
 
 // ============== SEARCH FUNCTION ==============
@@ -659,13 +644,13 @@ const handleSearch = async () => {
 
   hasSearched.value = true
   currentPage.value = 1
-  
+
   // Try to load from cache first
   const loaded = loadNewsFromCache()
   if (loaded) {
     return
   }
-  
+
   // If not in cache, fetch from API
   await fetchNews(true)
 }
@@ -675,17 +660,17 @@ const formatEventDate = (dateStr) => {
   const today = new Date()
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
-  
+
   // Parse DD-MM-YYYY format
   const [day, month, year] = dateStr.split('-').map(Number)
   const eventDate = new Date(year, month - 1, day)
-  
+
   if (eventDate.toDateString() === today.toDateString()) {
     return 'Today'
   } else if (eventDate.toDateString() === tomorrow.toDateString()) {
     return 'Tomorrow'
   }
-  
+
   return eventDate.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -698,7 +683,7 @@ const formatEventTime = (dateTime) => {
   if (!dateTime) return 'All Day'
   const [, time] = dateTime.split(' ')
   if (!time) return 'All Day'
-  
+
   // Convert 24h to 12h format
   const [hours, minutes] = time.split(':')
   const hour = parseInt(hours)
@@ -725,8 +710,6 @@ const debounce = (fn, delay) => {
   }
 }
 
-const debouncedApplyFilters = debounce(applyFilters, 500)
-
 const clearKeyword = () => {
   filters.keyword = ''
   applyFilters()
@@ -752,29 +735,53 @@ const getAuthToken = () => {
   return authToken
 }
 
+const fetchTrendingKeywords = async () => {
+  keywordLoading.value = true
+
+  try {
+    const response = await fetch(`${API_TRENDING_URL}/trends`)
+    const data = await response.json()
+
+    // API format:
+    // { top_keywords: [["iran",10],["oil",6],...] }
+
+    trendingKeywords.value = data.top_keywords || []
+
+  } catch (err) {
+    console.error("Failed to fetch keywords:", err)
+  } finally {
+    keywordLoading.value = false
+  }
+}
+
+const selectKeyword = (keyword) => {
+  filters.keyword = keyword
+  applyFilters()
+}
+
 // Fetch news using new API
 const fetchNews = async (forceRefresh = false) => {
   newsLoading.value = true
   error.value = null
-  
+
   try {
     const token = getAuthToken()
-    
+
     // Determine what to use as category
     // If category is selected, use that
     // Otherwise, use the keyword as the category
     const searchCategory = filters.category || filters.keyword
-    
+
     const payload = {
       category: searchCategory
     }
-    
+
     if (filters.last_updated) {
       payload.last_updated = filters.last_updated
     }
-    
+
     console.log('🔍 Searching news with payload:', payload)
-    
+
     const response = await fetch(`${API_BASE_URL}/insight/news`, {
       method: 'POST',
       headers: {
@@ -783,9 +790,9 @@ const fetchNews = async (forceRefresh = false) => {
       },
       body: JSON.stringify(payload)
     })
-    
+
     const data = await response.json()
-    
+
     if (data.code === '200') {
       allNews.value = data.data.data || []
       saveNewsToCache(allNews.value)
@@ -810,13 +817,13 @@ const fetchEvents = async (forceRefresh = false) => {
       return
     }
   }
-  
+
   eventsLoading.value = true
   eventsError.value = null
-  
+
   try {
     const token = getAuthToken()
-    
+
     const response = await fetch(`${API_BASE_URL}/insight/events`, {
       method: 'GET',
       headers: {
@@ -824,9 +831,9 @@ const fetchEvents = async (forceRefresh = false) => {
         'Authorization': `Bearer ${token}`
       }
     })
-    
+
     const data = await response.json()
-    
+
     if (data.code === '200') {
       events.value = data.data || []
       saveEventsToCache(events.value)
@@ -849,5 +856,5 @@ watch([() => filters.source, () => filters.keyword], () => {
 </script>
 
 <style scoped>
-  @import '../assets/styles/insight.css';
+@import '../assets/styles/insight.css';
 </style>

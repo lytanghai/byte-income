@@ -32,6 +32,37 @@
   gap: 18px;
 }
 
+.trending-keywords {
+  margin-top: 10px;
+}
+
+.trending-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #888;
+}
+
+.keyword-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.keyword-tag {
+  font-size: 12px;
+  padding: 4px 8px;
+  background: #1f2937;
+  color: white;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.keyword-tag:hover {
+  background: #3b82f6;
+}
+
 @media (max-width: 1024px) {
   .content-wrapper {
     grid-template-columns: 220px 1fr;

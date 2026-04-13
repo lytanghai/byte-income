@@ -373,9 +373,9 @@ const handleLogout = () => {
     localStorage.removeItem('notification_timestamp')
     
     // Stop polling
-    if (pollingInterval) {
-        clearInterval(pollingInterval)
-    }
+    // if (pollingInterval) {
+    //     clearInterval(pollingInterval)
+    // }
     
     // Stop datetime interval
     if (datetimeInterval) {
