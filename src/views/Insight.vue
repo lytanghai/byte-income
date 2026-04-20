@@ -91,9 +91,8 @@
           <button @click="handleSearch" class="btn-search"
             :disabled="(!filters.category && !filters.keyword) || newsLoading">
             <span v-if="newsLoading" class="spinner-small"></span>
-            <span class="btn-icon">🔍</span>
-            {{ newsLoading ? 'Searching...' : 'Search News' }}
-          </button>
+            {{ newsLoading ? 'Searching...' : 'Apply' }}
+          </button> <br>
           <small v-if="!filters.category && !filters.keyword" class="error-hint">
             Enter a category or keyword to search
           </small>
@@ -152,25 +151,23 @@
         <!-- Tab Navigation -->
         <div class="tab-navigation">
 
-          <button class="tab-btn" :class="{ active: activeTab === 'events' }" @click="activeTab = 'events'">
-            Forex Factory Calendar
-          </button>
-
-          <button class="tab-btn" :class="{ active: activeTab === 'news' }" @click="activeTab = 'news'">
+        <button class="tab-btn" :class="{ active: activeTab === 'news' }" @click="activeTab = 'news'">
             News Feed
           </button>
 
+          <button class="tab-btn" :class="{ active: activeTab === 'events' }" @click="activeTab = 'events'">
+            Forex Factory Calendar
+          </button>
         </div>
 
         <!-- News Feed Tab -->
         <div v-show="activeTab === 'news'" class="news-feed">
           <!-- Initial State - No Search Yet -->
           <div v-if="!hasSearched" class="initial-state">
-            <div class="initial-icon">🔍</div>
-            <h3>Search for News</h3>
+            <h3>🔍 Search for News</h3>
             <p>Enter a category or keyword to find relevant news articles</p>
-            <div class="search-hint">
-              <span class="hint-item">• Select a category OR enter a keyword</span>
+            <div class="search-hint"> <br>
+              <span class="hint-item">• Select a category OR enter a keyword</span> <br>
               <span class="hint-item">• You can add time filters for better results</span>
             </div>
           </div>
@@ -330,7 +327,7 @@ const error = ref(null)
 const eventsError = ref(null)
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
-const activeTab = ref('events')
+const activeTab = ref('news')
 const currentTime = ref(new Date())
 const hasSearched = ref(false)
 let timerInterval = null
