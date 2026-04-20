@@ -4,7 +4,7 @@
     <div class="page-header">
       <h1>Transaction Management</h1>
       <p class="subtitle">Create, view, update and delete trading transactions</p> <br>
-      <p>Record only last for 150 transactions only</p>
+      <p>Showing {{ itemsPerPage }} transactions per page (Total: {{ totalItems }} transactions)</p>
     </div>
 
     <!-- Action Bar with Create, Merge and Refresh Buttons -->
@@ -108,7 +108,7 @@
         <div class="card-icon">📋</div>
         <div class="card-content">
           <span class="card-label">Total Transactions</span>
-          <span class="card-value">{{ summary.totalCount }}/150</span>
+          <span class="card-value">{{ summary.totalCount }}/{{ totalItems }}</span>
         </div>
       </div>
     </div>
@@ -142,7 +142,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="transaction in paginatedTransactions" :key="transaction.sn">
+              <tr v-for="transaction in transactions" :key="transaction.sn">
                 <td>
                   <span class="symbol-badge">{{ transaction.symbol || '-' }}</span>
                 </td>
@@ -171,13 +171,13 @@
 
         <!-- Pagination for Desktop -->
         <div class="pagination">
-          <button @click="changePage(currentPage - 1)" :disabled="currentPage === 1" class="pagination-btn">
+          <button @click="changePage(currentPage - 1)" :disabled="currentPage === 0" class="pagination-btn">
             ← Previous
           </button>
           <span class="page-info">
-            Page {{ currentPage }} of {{ totalPages }}
+            Page {{ currentPage + 1 }} of {{ totalPages }}
           </span>
-          <button @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages" class="pagination-btn">
+          <button @click="changePage(currentPage + 1)" :disabled="currentPage >= totalPages - 1" class="pagination-btn">
             Next →
           </button>
         </div>
@@ -202,7 +202,6 @@
                 <div class="transaction-right">
                   <span class="transaction-amount" :class="getAmountClass(transaction)">
                     {{ formatAmountWithSign(transaction) }} {{ transaction.currency }}
-                    
                   </span>
                   <span class="transaction-currency">{{ convertDateToBankType(transaction.date.toString()) }} </span>
                 </div>
@@ -231,11 +230,11 @@
         
         <!-- Mobile Pagination -->
         <div class="mobile-pagination">
-          <button @click="changePage(currentPage - 1)" :disabled="currentPage === 1" class="pagination-btn mobile">
+          <button @click="changePage(currentPage - 1)" :disabled="currentPage === 0" class="pagination-btn mobile">
             ← Previous
           </button>
-          <span class="page-info">Page {{ currentPage }} of {{ totalPages }}</span>
-          <button @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages" class="pagination-btn mobile">
+          <span class="page-info">Page {{ currentPage + 1 }} of {{ totalPages }}</span>
+          <button @click="changePage(currentPage + 1)" :disabled="currentPage >= totalPages - 1" class="pagination-btn mobile">
             Next →
           </button>
         </div>
@@ -342,75 +341,75 @@
 
     <!-- Merge Transactions Modal -->
     <div v-if="showMergeModal" class="modal-overlay" @click="closeMergeModal">
-  <div class="modal-content" @click.stop>
-    <div class="modal-header">
-      <h2>Merge Transactions</h2>
-      <button class="close-btn" @click="closeMergeModal">✕</button>
-    </div>
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h2>Merge Transactions</h2>
+          <button class="close-btn" @click="closeMergeModal">✕</button>
+        </div>
 
-    <div class="modal-body">
-      <div class="info-box">
-        <span class="info-icon">🔄</span>
-        <span class="info-text">This will merge all transactions from the selected date into a single consolidated transaction.</span>
-      </div>
+        <div class="modal-body">
+          <div class="info-box">
+            <span class="info-icon">🔄</span>
+            <span class="info-text">This will merge all transactions from the selected date into a single consolidated transaction.</span>
+          </div>
 
-      <div class="form-group">
-        <label for="merge-date">Select Date <span class="required-star">*</span></label>
-        <input 
-          type="date" 
-          id="merge-date" 
-          v-model="mergeDate" 
-          class="form-input" 
-          placeholder="dd/mm/yyyy"
-        />
-        <small class="hint">All transactions on this date will be merged</small>
-      </div>
+          <div class="form-group">
+            <label for="merge-date">Select Date <span class="required-star">*</span></label>
+            <input 
+              type="date" 
+              id="merge-date" 
+              v-model="mergeDate" 
+              class="form-input" 
+              placeholder="dd/mm/yyyy"
+            />
+            <small class="hint">All transactions on this date will be merged</small>
+          </div>
 
-      <div v-if="selectedDateTransactions.length > 0" class="preview-section">
-        <h4>Transactions to be merged:</h4>
-        <div class="preview-list">
-          <div v-for="tx in selectedDateTransactions" :key="tx.sn" class="preview-item">
-            <div class="preview-item-left">
-              <span class="preview-type-badge" :class="tx.type.toLowerCase()">{{ tx.type }}</span>
-              <span class="preview-symbol">{{ tx.symbol || '-' }}</span>
+          <div v-if="selectedDateTransactions.length > 0" class="preview-section">
+            <h4>Transactions to be merged:</h4>
+            <div class="preview-list">
+              <div v-for="tx in selectedDateTransactions" :key="tx.sn" class="preview-item">
+                <div class="preview-item-left">
+                  <span class="preview-type-badge" :class="tx.type.toLowerCase()">{{ tx.type }}</span>
+                  <span class="preview-symbol">{{ tx.symbol || '-' }}</span>
+                </div>
+                <div class="preview-item-right">
+                  <span class="preview-amount" :class="getAmountClass(tx)">
+                    {{ formatTransactionAmount(tx) }}
+                  </span>
+                  <span class="preview-currency">{{ tx.currency }}</span>
+                </div>
+              </div>
             </div>
-            <div class="preview-item-right">
-              <span class="preview-amount" :class="getAmountClass(tx)">
-                {{ formatTransactionAmount(tx) }}
-              </span>
-              <span class="preview-currency">{{ tx.currency }}</span>
+            <div class="preview-total">
+              <span class="total-label">Total Transactions:</span>
+              <span class="total-value">{{ selectedDateTransactions.length }}</span>
             </div>
           </div>
+
+          <div v-else-if="mergeDate" class="no-transactions-message">
+            <span class="message-icon">📭</span>
+            <span>No transactions found for this date</span>
+          </div>
         </div>
-        <div class="preview-total">
-          <span class="total-label">Total Transactions:</span>
-          <span class="total-value">{{ selectedDateTransactions.length }}</span>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="closeMergeModal" :disabled="merging">
+            Cancel
+          </button>
+          <button 
+            type="button" 
+            class="btn btn-merge-modal" 
+            @click="handleMerge" 
+            :disabled="!mergeDate || selectedDateTransactions.length === 0 || merging"
+          >
+            <span v-if="merging" class="spinner-small"></span>
+            <span class="btn-icon" v-else>🔄</span>
+            {{ merging ? 'Merging...' : 'Merge Transactions' }}
+          </button>
         </div>
       </div>
-
-      <div v-else-if="mergeDate" class="no-transactions-message">
-        <span class="message-icon">📭</span>
-        <span>No transactions found for this date</span>
-      </div>
     </div>
-
-    <div class="modal-footer">
-      <button type="button" class="btn btn-secondary" @click="closeMergeModal" :disabled="merging">
-        Cancel
-      </button>
-      <button 
-        type="button" 
-        class="btn btn-merge-modal" 
-        @click="handleMerge" 
-        :disabled="!mergeDate || selectedDateTransactions.length === 0 || merging"
-      >
-        <span v-if="merging" class="spinner-small"></span>
-        <span class="btn-icon" v-else>🔄</span>
-        {{ merging ? 'Merging...' : 'Merge Transactions' }}
-      </button>
-    </div>
-  </div>
-</div>
 
     <!-- Delete Confirmation Modal -->
     <div v-if="showDeleteModal" class="modal-overlay" @click="closeDeleteModal">
@@ -444,7 +443,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useNotification } from '../composables/useNotification'
 import { useCache } from '../composables/useCache'
 import { formatMoney } from '../services/util'
@@ -454,6 +453,7 @@ const { setCache, getCache } = useCache()
 const saveCacheData = (cacheName, data) => {
   setCache(cacheName, data, 5) // Expires in 5 minutes
 }
+
 // Initialize notification
 const notification = useNotification()
 
@@ -471,11 +471,10 @@ const refreshing = ref(false)
 const merging = ref(false)
 const error = ref(null)
 const submitting = ref(false)
-const currentPage = ref(1)
-const itemsPerPage = ref(10)
-const totalPages = computed(() => {
-  return Math.ceil(filteredTransactions.value.length / itemsPerPage.value) || 1
-})
+const currentPage = ref(0) // Start from page 0
+const itemsPerPage = ref(10) // Default to 10 items per request
+const totalPages = ref(1)
+const totalItems = ref(0)
 const lastUpdated = ref(null)
 const cacheStatus = ref({ type: 'fresh', text: 'Loading...' })
 
@@ -563,7 +562,7 @@ const selectedDateTransactions = computed(() => {
 const groupedByDate = computed(() => {
   const groups = {}
   
-  filteredTransactions.value.forEach(tx => {
+  transactions.value.forEach(tx => {
     const date = new Date(tx.date)
     const dateKey = date.toDateString()
     
@@ -602,15 +601,21 @@ const getAuthToken = () => {
 }
 
 // ============== CACHE MANAGEMENT ==============
-const saveToCache = (data) => {
+const saveToCache = (data, page, totalPagesCount, totalItemsCount) => {
   try {
-    saveCacheData(CACHE_KEY, JSON.stringify(data), 5)
+    const cacheData = {
+      transactions: data,
+      currentPage: page,
+      totalPages: totalPagesCount,
+      totalItems: totalItemsCount
+    }
+    saveCacheData(CACHE_KEY, JSON.stringify(cacheData), 5)
 
     const timestamp = new Date().toISOString()
     saveCacheData(CACHE_TIMESTAMP_KEY, timestamp, 5)
     lastUpdated.value = timestamp
     cacheStatus.value = { type: 'cached', text: 'Cached data' }
-    console.log('✅ Data saved to cache:', data.length, 'transactions')
+    // console.log('✅ Data saved to cache:', data.length, 'transactions')
   } catch (err) {
     console.error('Failed to save to cache:', err)
   }
@@ -622,8 +627,11 @@ const loadFromCache = () => {
     const timestamp = getCache(CACHE_TIMESTAMP_KEY)
 
     if (cached && timestamp) {
-      const data = JSON.parse(cached)
-      transactions.value = data
+      const cacheData = JSON.parse(cached)
+      transactions.value = cacheData.transactions || []
+      currentPage.value = cacheData.currentPage || 0
+      totalPages.value = cacheData.totalPages || 1
+      totalItems.value = cacheData.totalItems || 0
       lastUpdated.value = timestamp
 
       const cacheTime = new Date(timestamp).getTime()
@@ -636,7 +644,7 @@ const loadFromCache = () => {
         cacheStatus.value = { type: 'stale', text: 'Stale data' }
       }
 
-      console.log('✅ Loaded from cache:', data.length, 'transactions, age:', ageInMinutes, 'minutes')
+      // console.log('✅ Loaded from cache:', transactions.value.length, 'transactions, total pages:', totalPages.value)
       return true
     }
   } catch (err) {
@@ -646,7 +654,7 @@ const loadFromCache = () => {
 }
 
 // ============== API CALLS ==============
-const fetchFromAPI = async (forceRefresh = false) => {
+const fetchFromAPI = async (forceRefresh = false, page = 0) => {
   loading.value = true
   if (forceRefresh) refreshing.value = true
   error.value = null
@@ -661,8 +669,8 @@ const fetchFromAPI = async (forceRefresh = false) => {
         'Authorization': `Bearer ${token}`
       },
       body: JSON.stringify({
-        size: 150,
-        page: "0"
+        size: itemsPerPage.value,
+        page: page.toString()
       })
     })
 
@@ -670,14 +678,21 @@ const fetchFromAPI = async (forceRefresh = false) => {
 
     if (data.code === '200') {
       const content = data.data.content || []
+      
+      // Extract pagination info from API response
+      totalItems.value = data.data.total_element || 0
+      totalPages.value = data.data.total_page || 1
+      currentPage.value = page
+      
       transactions.value = content
-      saveToCache(content)
+      
+      saveToCache(content, page, totalPages.value, totalItems.value)
 
       if (forceRefresh) {
         notification.success('Data refreshed successfully')
       }
 
-      console.log('✅ API fetch successful:', content.length, 'transactions')
+      // console.log('✅ API fetch successful:', content.length, 'transactions, page:', page, 'total pages:', totalPages.value)
     } else {
       throw new Error(data.message || 'Failed to fetch transactions')
     }
@@ -704,7 +719,7 @@ const mergeTransactions = async () => {
       date: formattedDate
     }
 
-    console.log('🔄 Merging transactions with payload:', payload)
+    // console.log('🔄 Merging transactions with payload:', payload)
 
     const response = await fetch(`${API_BASE_URL}/merge-transaction`, {
       method: 'POST',
@@ -719,7 +734,7 @@ const mergeTransactions = async () => {
 
     if (data.code === '200') {
       notification.success(data.message || 'Transactions merged successfully')
-      await fetchFromAPI(true) // Refresh after merge
+      await fetchFromAPI(true, currentPage.value) // Refresh after merge, stay on current page
       return true
     } else {
       throw new Error(data.message || 'Failed to merge transactions')
@@ -732,11 +747,11 @@ const mergeTransactions = async () => {
 
 // ============== INITIALIZATION ==============
 onMounted(() => {
-  console.log('🚀 Component mounted')
+  // console.log('🚀 Component mounted')
   const hasCache = loadFromCache()
   if (!hasCache) {
-    console.log('No cache found, fetching from API...')
-    fetchFromAPI(false)
+    // console.log('No cache found, fetching from API...')
+    fetchFromAPI(false, 0) // Start from page 0
   } else {
     console.log('Cache found, using cached data (NO API CALL)')
   }
@@ -748,19 +763,16 @@ const createTransaction = async () => {
     const token = getAuthToken()
 
     const payload = {
-      symbol: form.symbol || '', // Include symbol (required)
-      currency: form.currency,    // Required
-      pnl: parseFloat(form.pnl),  // Required
-      type: form.type.toLowerCase() // Required
+      symbol: form.symbol || '',
+      currency: form.currency,
+      pnl: parseFloat(form.pnl),
+      type: form.type.toLowerCase()
     }
 
-    // Add optional date if provided - FORMAT: DD/MM/YYYY
     if (form.date) {
       const [year, month, day] = form.date.split('-')
-      payload.inp_date = `${day}/${month}/${year}` // DD/MM/YYYY format
+      payload.inp_date = `${day}/${month}/${year}`
     }
-
-    console.log('📤 Creating transaction with payload:', payload)
 
     const response = await fetch(`${API_BASE_URL}/create`, {
       method: 'POST',
@@ -775,7 +787,7 @@ const createTransaction = async () => {
 
     if (data.code === '200') {
       notification.success('Transaction created successfully')
-      await fetchFromAPI(true)
+      await fetchFromAPI(true, 0) // Refresh and go to first page
       return true
     } else {
       throw new Error(data.message || 'Failed to create transaction')
@@ -787,8 +799,7 @@ const createTransaction = async () => {
 }
 
 const convertDateToBankType = (input) => {
-  const date = new Date(input);
-
+  const date = new Date(input)
   const formatted = date.toLocaleString("en-US", {
     month: "short",
     day: "2-digit",
@@ -797,11 +808,10 @@ const convertDateToBankType = (input) => {
     minute: "2-digit",
     second: "2-digit",
     hour12: false
-  });
+  })
+  return formatted.replace(",", "")
+}
 
-  // remove the extra comma after year
-  return formatted.replace(",", "");
-};
 const updateTransaction = async () => {
   try {
     const token = getAuthToken()
@@ -824,7 +834,7 @@ const updateTransaction = async () => {
 
     if (data.code === '200') {
       notification.success('Transaction updated successfully')
-      await fetchFromAPI(true)
+      await fetchFromAPI(true, currentPage.value) // Refresh and stay on current page
       return true
     } else {
       throw new Error(data.message || 'Failed to update transaction')
@@ -852,7 +862,13 @@ const deleteTransaction = async () => {
 
     if (data.code === '200') {
       notification.success('Transaction deleted successfully')
-      await fetchFromAPI(true)
+      
+      // If this was the last item on the page and not first page, go to previous page
+      if (transactions.value.length === 1 && currentPage.value > 0) {
+        await fetchFromAPI(true, currentPage.value - 1)
+      } else {
+        await fetchFromAPI(true, currentPage.value)
+      }
       return true
     } else {
       throw new Error(data.message || 'Failed to delete transaction')
@@ -865,11 +881,12 @@ const deleteTransaction = async () => {
 
 // ============== UI HANDLERS ==============
 const handleRefresh = async () => {
-  await fetchFromAPI(true)
+  await fetchFromAPI(true, currentPage.value)
 }
 
 const applyFilters = () => {
-  currentPage.value = 1
+  // Reset to first page when applying filters
+  fetchFromAPI(true, 0)
 }
 
 const debounce = (fn, delay) => {
@@ -882,8 +899,8 @@ const debounce = (fn, delay) => {
 const debouncedApplyFilters = debounce(applyFilters, 500)
 
 const changePage = (page) => {
-  if (page >= 1 && page <= totalPages.value) {
-    currentPage.value = page
+  if (page >= 0 && page < totalPages.value) {
+    fetchFromAPI(false, page)
   }
 }
 
@@ -892,7 +909,7 @@ const resetFilters = () => {
   filters.type = ''
   filters.currency = ''
   filters.date = ''
-  currentPage.value = 1
+  fetchFromAPI(true, 0)
 }
 
 // Merge modal handlers
@@ -930,30 +947,9 @@ const handleMerge = async () => {
 }
 
 // ============== COMPUTED ==============
-const filteredTransactions = computed(() => {
-  let data = transactions.value.filter(t => {
-    if (filters.symbol && !t.symbol?.toLowerCase().includes(filters.symbol.toLowerCase())) return false
-    if (filters.type && t.type !== filters.type) return false
-    if (filters.currency && t.currency !== filters.currency) return false
-    if (filters.date) {
-      const tDate = new Date(t.date).toISOString().split('T')[0]
-      if (tDate !== filters.date) return false
-    }
-    return true
-  })
-
-  data.sort((a, b) => new Date(b.date) - new Date(a.date))
-
-  return data
-})
-
-const paginatedTransactions = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage.value
-  const end = start + itemsPerPage.value
-  return filteredTransactions.value.slice(start, end)
-})
-
 const summary = computed(() => {
+  // Note: This calculates based on current page only
+  // For accurate totals across all pages, backend should provide aggregates
   const totalProfit = transactions.value
     .filter(t => t.type === 'PROFIT')
     .reduce((sum, t) => sum + t.pnl, 0)
@@ -975,15 +971,6 @@ const hasActiveFilters = computed(() => {
 })
 
 // ============== FORMATTERS ==============
-const formatCurrency = (value) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(value || 0)
-}
-
 const formatTransactionAmount = (transaction) => {
   if (!transaction) return '-'
   const amount = transaction.pnl || 0
@@ -1012,22 +999,23 @@ const formatDailyTotal = (transactions) => {
 const convertToUSDC = (amount, currency) => {
   if (currency === 'USD') return amount * 100
   if (currency === 'USDC') return amount
-  return 0 // or throw / handle other currencies later
+  return 0
 }
+
 const calculateTradingPnL = (transactions) => {
   return transactions.reduce((sum, t) => {
     const value = convertToUSDC(t.pnl, t.currency)
-
     if (t.type === 'PROFIT') return sum + value
     if (t.type === 'LOSS') return sum - value
     return sum
   }, 0)
 }
+
 const getDailyTotalClass = (transactions) => {
   const total = transactions.reduce((sum, t) => {
     if (t.type === 'PROFIT') return sum + t.pnl
     if (t.type === 'LOSS') return sum - t.pnl
-    return sum // ignore DEPOSIT & WITHDRAWAL
+    return sum
   }, 0)
   
   if (total > 0) return 'profit'

@@ -361,7 +361,7 @@ const saveCalendarToCache = (data) => {
     }
     saveCacheData(CALENDAR_CACHE_KEY, JSON.stringify(cacheData), 10)
     saveCacheData(CALENDAR_TIMESTAMP_KEY, new Date().toISOString(), 10)
-    console.log('✅ Calendar data saved to cache')
+    // console.log('✅ Calendar data saved to cache')
   } catch (err) {
     console.error('Failed to save calendar to cache:', err)
   }
@@ -370,7 +370,7 @@ const saveCalendarToCache = (data) => {
 const loadCalendarFromCache = () => {
   try {
     const cached = getCache(CALENDAR_CACHE_KEY)
-    console.log("data " + cached)
+    // console.log("data " + cached)
     const timestamp = getCache(CALENDAR_TIMESTAMP_KEY)
     
     if (cached && timestamp) {
@@ -379,7 +379,7 @@ const loadCalendarFromCache = () => {
       // Check if cached data is for current month/year
       if (cacheData.month === selectedMonth.value && cacheData.year === selectedYear.value) {
         calendarData.value = cacheData.data
-        console.log('✅ Calendar loaded from cache')
+        // console.log('✅ Calendar loaded from cache')
         return true
       }
     }
@@ -405,7 +405,7 @@ const saveTransactionsToCache = (data) => {
     }
     saveCacheData(cacheKey, JSON.stringify(cacheData) ,10)
     saveCacheData(TRANSACTIONS_TIMESTAMP_KEY, new Date().toISOString() ,10)
-    console.log('✅ Transactions saved to cache')
+    // console.log('✅ Transactions saved to cache')
   } catch (err) {
     console.error('Failed to save transactions to cache:', err)
   }
@@ -429,7 +429,7 @@ const loadTransactionsFromCache = () => {
         hasMoreTransactions.value = cacheData.hasMore
         totalTransactionElements.value = cacheData.total
         
-        console.log('✅ Transactions loaded from cache')
+        // console.log('✅ Transactions loaded from cache')
         return true
       }
     }
@@ -474,7 +474,7 @@ const streakStats = computed(() => {
   if (!calendarData.value?.days) return null
   
   const days = calendarData.value.days
-  console.log('📊 Calculating streaks from days:', days.map(d => ({day: d.day, pnl: d.pnl})))
+  // console.log('📊 Calculating streaks from days:', days.map(d => ({day: d.day, pnl: d.pnl})))
   
   // Sort days by day number to ensure we process in order
   const sortedDays = [...days].sort((a, b) => a.day - b.day)
@@ -588,16 +588,16 @@ const streakStats = computed(() => {
     console.log(`Day ${day.day}: pnl=${day.pnl}, currentWin=${currentWinStreak}, currentLoss=${currentLossStreak}`)
   }
   
-  console.log('📊 Streak Results:', {
-    currentWinStreak,
-    currentLossStreak,
-    longestWinStreak,
-    longestLossStreak,
-    currentWinStart,
-    currentWinEnd,
-    currentLossStart,
-    currentLossEnd
-  })
+  // console.log('📊 Streak Results:', {
+  //   currentWinStreak,
+  //   currentLossStreak,
+  //   longestWinStreak,
+  //   longestLossStreak,
+  //   currentWinStart,
+  //   currentWinEnd,
+  //   currentLossStart,
+  //   currentLossEnd
+  // })
   
   return {
     currentWinStreak,
@@ -780,11 +780,11 @@ const fetchMonthlyPerformance = async (forceRefresh = false) => {
     })
     
     const data = await response.json()
-    console.log('📅 Calendar API response:', data)
+    // console.log('📅 Calendar API response:', data)
     
     if (data.code === '200') {
       calendarData.value = data.data
-      console.log('📅 Calendar days:', data.data.days)
+      // console.log('📅 Calendar days:', data.data.days)
       saveCalendarToCache(data.data)
       selectedDay.value = null
       fetchTransactions(true)

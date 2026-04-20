@@ -15,7 +15,7 @@
     <!-- Error State -->
     <div v-else-if="error" class="error-state">
       <p class="error-message">{{ error }}</p>
-      <button @click="loadCacheData" class="btn-retry">Retry</button>
+      <button @click="loadAllCacheData" class="btn-retry">Retry</button>
     </div>
 
     <!-- Dashboard Content -->
@@ -105,7 +105,7 @@
         <div class="stat-card transactions">
           <div class="stat-header">
             <h3>Transactions</h3>
-            <span class="stat-updated">Last 30 days</span>
+            <span class="stat-updated">All time</span>
           </div>
           <div class="stat-body">
             <div class="stat-row">
@@ -188,7 +188,7 @@
         <div class="chart-card">
           <div class="chart-header">
             <h3>Recent Transactions</h3>
-            <span class="chart-badge">Last 7 days</span>
+            <span class="chart-badge">Last {{ recentTransactions.length }} transactions</span>
           </div>
           <div class="chart-body">
             <div v-if="recentTransactions.length === 0" class="no-chart-data">
@@ -197,7 +197,7 @@
             <div v-else class="transaction-list">
               <div v-for="tx in recentTransactions" :key="tx.sn" class="transaction-item">
                 <div class="tx-info">
-                  <span class="tx-symbol">{{ tx.symbol }}</span>
+                  <span class="tx-symbol">{{ tx.symbol || '-' }}</span>
                   <span class="tx-type" :class="tx.type.toLowerCase()">{{ tx.type }}</span>
                 </div>
                 <span class="tx-amount" :class="tx.type.toLowerCase()">
@@ -288,6 +288,10 @@ const loading = ref(true)
 const refreshing = ref(false)
 const error = ref(null)
 
+// All transactions from all pages
+const allTransactions = ref([])
+const allTransactionsLoaded = ref(false)
+
 // Cache data
 const cacheData = reactive({
   transactions: [],
@@ -305,14 +309,48 @@ const cacheData = reactive({
   notifications: []
 })
 
+// ============== LOAD ALL TRANSACTIONS FROM PAGINATED CACHE ==============
+const loadAllTransactionsFromCache = async () => {
+  try {
+    // The transaction cache now stores paginated data
+    // We need to load all pages or use the total count from cache
+    const cachedTransactionData = getCache('transaction_cache')
+    
+    if (cachedTransactionData) {
+      const data = JSON.parse(cachedTransactionData)
+      // Check if it's the new paginated cache structure
+      if (data.transactions && Array.isArray(data.transactions)) {
+        // This is a single page of transactions
+        allTransactions.value = data.transactions
+        allTransactionsLoaded.value = true
+        // console.log(`✅ Loaded ${allTransactions.value.length} transactions from cache (page ${data.currentPage + 1} of ${data.totalPages})`)
+      } else if (Array.isArray(data)) {
+        // Old cache structure (all transactions in one array)
+        allTransactions.value = data
+        allTransactionsLoaded.value = true
+        // console.log(`✅ Loaded ${allTransactions.value.length} transactions from legacy cache`)
+      } else {
+        allTransactions.value = []
+        console.warn('Unknown transaction cache structure')
+      }
+    } else {
+      allTransactions.value = []
+      // console.log('No transaction cache found')
+    }
+  } catch (err) {
+    // console.error('Failed to load transactions from cache:', err)
+    allTransactions.value = []
+  }
+}
+
 // ============== LOAD CACHE DATA ==============
-const loadCacheData = () => {
+const loadAllCacheData = async () => {
   loading.value = true
   error.value = null
 
   try {
-    // Load Transaction Cache
-    loadTransactionCache()
+    // Load all transactions from paginated cache
+    await loadAllTransactionsFromCache()
     
     // Load Performance Cache
     loadPerformanceCache()
@@ -326,7 +364,7 @@ const loadCacheData = () => {
     // Load Notification Cache
     loadNotificationCache()
 
-    console.log('✅ Dashboard data loaded from cache')
+    // console.log('✅ Dashboard data loaded from cache')
   } catch (err) {
     error.value = 'Failed to load dashboard data from cache'
     console.error('Error loading cache:', err)
@@ -337,23 +375,11 @@ const loadCacheData = () => {
 
 const refreshCache = () => {
   refreshing.value = true
-  loadCacheData()
+  loadAllCacheData()
   setTimeout(() => {
     refreshing.value = false
     notification.success('Cache refreshed successfully')
   }, 500)
-}
-
-// ============== TRANSACTION CACHE ==============
-const loadTransactionCache = () => {
-  try {
-    const cached = getCache('transaction_cache')
-    if (cached) {
-      cacheData.transactions = JSON.parse(cached)
-    }
-  } catch (err) {
-    console.error('Failed to load transaction cache:', err)
-  }
 }
 
 // ============== PERFORMANCE CACHE ==============
@@ -377,6 +403,7 @@ const loadMarketCache = () => {
     if (goldData) {
       const data = JSON.parse(goldData)
       cacheData.market.gold = data.price
+      cacheData.market.goldChange = data.change
     }
 
     // Try to get DXY from market page cache
@@ -427,13 +454,13 @@ const loadNotificationCache = () => {
 
 // ============== COMPUTED SUMMARY ==============
 const summaryData = computed(() => {
-  const transactions = cacheData.transactions || []
+  const transactions = allTransactions.value || []
   const performance = cacheData.performance
   const news = cacheData.insight.news || []
   const events = cacheData.insight.events || []
   const notifications = cacheData.notifications || []
 
-  // Calculate transaction summary
+  // Calculate transaction summary from ALL transactions
   const profitTxs = transactions.filter(t => t.type === 'PROFIT')
   const lossTxs = transactions.filter(t => t.type === 'LOSS')
   const depositTxs = transactions.filter(t => t.type === 'DEPOSIT')
@@ -509,11 +536,12 @@ const summaryData = computed(() => {
   }
 })
 
-// Recent transactions (last 5)
+// Recent transactions (last 10 from all transactions)
 const recentTransactions = computed(() => {
-  return (cacheData.transactions || [])
-    .slice(0, 5)
+  const all = [...(allTransactions.value || [])]
+  return all
     .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 10)
 })
 
 // Top news (last 3)
@@ -643,7 +671,7 @@ const getSourceClass = (source) => {
 
 // Initialize
 onMounted(() => {
-  loadCacheData()
+  loadAllCacheData()
 })
 </script>
 
