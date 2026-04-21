@@ -1,14 +1,14 @@
-<template>
+<!-- <template>
   <div class="polymarket-container">
     <!-- Header Section -->
     <div class="header">
       <h1>
         <i class="fas fa-chart-line" style="margin-right: 10px; color: #3b82f6;"></i> 
-        Polymarket Polls
+        Polymarket Events & Polls
       </h1>
-      <p>Explore real-time prediction markets & question polls from Polymarket API</p>
+      <p>Explore real-time prediction markets, events, and question polls from Polymarket Gamma API</p>
       <div class="badge">
-        <i class="fas fa-database"></i> Live from Polymarket Gamma
+        <i class="fas fa-database"></i> Live from Polymarket Gamma API
       </div>
     </div>
 
@@ -19,8 +19,23 @@
         <input 
           type="text" 
           v-model="searchQuery"
-          placeholder="Filter by question or description..."
+          placeholder="Filter by event title, question, or category..."
         />
+      </div>
+      <div class="limit-control">
+        <label>Events per page:</label>
+        <select v-model="limit" class="limit-select" @change="refreshEvents">
+          <option :value="10">10</option>
+          <option :value="20">20</option>
+          <option :value="50">50</option>
+          <option :value="100">100</option>
+        </select>
+      </div>
+      <div class="category-filter">
+        <select v-model="selectedCategory" class="category-select">
+          <option value="all">All Categories</option>
+          <option v-for="cat in uniqueCategories" :key="cat" :value="cat">{{ cat }}</option>
+        </select>
       </div>
       <div class="status-filter">
         <button 
@@ -33,106 +48,151 @@
           {{ filter.label }}
         </button>
       </div>
-      <button class="refresh-btn" @click="fetchMarkets" :disabled="loading">
+      <button class="refresh-btn" @click="refreshEvents" :disabled="loading">
         <i class="fas fa-sync-alt" :class="{ 'fa-spin': loading }"></i>
         Refresh
       </button>
     </div>
 
     <!-- Stats Section -->
-    <div class="stats" v-if="!loading && filteredMarkets.length > 0">
-      <span><i class="fas fa-chart-simple"></i> Showing {{ filteredMarkets.length }} markets</span>
+    <div class="stats" v-if="!loading && filteredEvents.length > 0">
+      <span><i class="fas fa-chart-simple"></i> Showing {{ filteredEvents.length }} of {{ events.length }} events</span>
       <span><i class="fas fa-clock"></i> Last update: {{ lastUpdated || '—' }}</span>
+      <span><i class="fas fa-chart-line"></i> Total Volume: {{ formatMoney(totalVolume) }}</span>
     </div>
 
     <!-- Loading State -->
     <div v-if="loading" class="loading-state">
       <i class="fas fa-spinner fa-pulse fa-2x" style="color:#3b82f6"></i>
-      <p style="margin-top: 1rem;">Loading prediction markets from Polymarket...</p>
+      <p style="margin-top: 1rem;">Loading events from Polymarket Gamma API...</p>
     </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="error-state">
       <i class="fas fa-circle-exclamation fa-2x" style="color:#ef4444"></i>
       <p style="margin-top: 0.5rem; font-weight: 500;">{{ error }}</p>
-      <button @click="fetchMarkets" class="retry-btn">Retry</button>
+      <button @click="refreshEvents" class="retry-btn">Retry</button>
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="filteredMarkets.length === 0" class="empty-state">
+    <div v-else-if="filteredEvents.length === 0" class="empty-state">
       <i class="fas fa-poll fa-2x" style="color:#94a3b8"></i>
-      <p>No markets match your filters or search.</p>
-      <p style="font-size: 0.8rem;">Try adjusting keywords or status.</p>
+      <p>No events match your filters or search.</p>
+      <p style="font-size: 0.8rem;">Try adjusting keywords or category.</p>
     </div>
 
-    <!-- Markets Grid -->
-    <div class="markets-grid" v-else>
-      <div v-for="market in filteredMarkets" :key="market.id" class="market-card">
-        <div class="card-header">
-          <div class="question">{{ market.question || market.title || 'Untitled Market' }}</div>
-          <div class="meta-info">
-            <span class="status" :class="marketStatusClass(market)">
-              {{ formatStatus(market) }}
+    <!-- Events Grid -->
+    <div class="events-grid" v-else>
+      <div v-for="event in filteredEvents" :key="event.id" class="event-card">
+        <!-- Event Header -->
+        <div class="event-header">
+          <div class="event-category" v-if="event.category">
+            <i class="fas fa-tag"></i> {{ event.category }}
+          </div>
+          <div class="event-title">{{ event.title || event.ticker || 'Untitled Event' }}</div>
+          <div class="event-description" v-if="event.description">
+            {{ truncate(event.description, 120) }}
+          </div>
+          <div class="event-meta">
+            <span class="status" :class="getEventStatusClass(event)">
+              {{ getEventStatus(event) }}
             </span>
-            <span>
+            <span v-if="event.startDate">
               <i class="far fa-calendar-alt"></i> 
-              {{ formatDate(market.endDate) || 'Open ended' }}
+              Starts: {{ formatDate(event.startDate) }}
             </span>
-            <span v-if="market.ticker">
-              <i class="fas fa-tag"></i> {{ market.ticker }}
+            <span v-if="event.endDate">
+              <i class="far fa-calendar-check"></i> 
+              Ends: {{ formatDate(event.endDate) }}
+            </span>
+            <span v-if="event.volume">
+              <i class="fas fa-dollar-sign"></i> 
+              Vol: {{ formatMoney(event.volume) }}
+            </span>
+            <span v-if="event.liquidity">
+              <i class="fas fa-water"></i> 
+              Liq: {{ formatMoney(event.liquidity) }}
             </span>
           </div>
         </div>
 
-        <div class="outcome-area">
-          <!-- Poll Answers / Outcomes -->
-          <div 
-            v-if="market.outcomes && market.outcomes.length" 
-            v-for="(outcome, idx) in market.outcomes" 
-            :key="idx" 
-            class="poll-option"
-          >
-            <div class="option-label">
-              <span><strong>{{ outcome.name || `Option ${idx+1}` }}</strong></span>
-              <span>{{ formatPercent(market.probabilities?.[idx]) }}</span>
-            </div>
-            <div class="prob-bar-bg">
-              <div 
-                class="prob-bar" 
-                :class="{ highlight: isHighestProb(market, idx) }" 
-                :style="{ width: getProbWidth(market.probabilities?.[idx]) }"
-              ></div>
-            </div>
+        <!-- Markets Section -->
+        <div class="markets-section" v-if="event.markets && event.markets.length">
+          <div class="section-title">
+            <i class="fas fa-chart-simple"></i> Prediction Markets ({{ event.markets.length }})
           </div>
-
-          <!-- Fallback for markets without structured outcomes -->
-          <div v-if="(!market.outcomes || market.outcomes.length === 0) && market.description" class="poll-option">
-            <div class="option-label">
-              <span><i class="fas fa-info-circle"></i> Description</span>
+          
+          <div v-for="market in event.markets" :key="market.id" class="market-item">
+            <div class="market-question">
+              {{ market.question }}
             </div>
-            <p class="description-text">{{ truncate(market.description, 110) }}</p>
-            <div v-if="market.probability" class="fallback-probability">
-              <span style="font-size:0.7rem;">Implied probability: {{ (market.probability * 100).toFixed(1) }}%</span>
-              <div class="prob-bar-bg">
-                <div class="prob-bar" :style="{ width: (market.probability * 100) + '%' }"></div>
+            
+            <!-- Poll Answers / Outcomes -->
+            <div class="outcomes-area">
+              <div 
+                v-if="market.outcomes && market.outcomes.length" 
+                v-for="(outcome, idx) in parseOutcomes(market.outcomes)" 
+                :key="idx" 
+                class="poll-option"
+              >
+                <div class="option-label">
+                  <span><strong>{{ outcome }}</strong></span>
+                  <span>{{ formatPercent(getOutcomePrice(market, idx)) }}</span>
+                </div>
+                <div class="prob-bar-bg">
+                  <div 
+                    class="prob-bar" 
+                    :class="{ highlight: isHighestProb(market, idx) }" 
+                    :style="{ width: getProbWidth(getOutcomePrice(market, idx)) }"
+                  ></div>
+                </div>
+              </div>
+
+              <!-- Market Stats -->
+              <div class="market-stats">
+                <span v-if="market.volumeNum">
+                  <i class="fas fa-chart-line"></i> Volume: {{ formatMoney(market.volumeNum) }}
+                </span>
+                <span v-if="market.liquidityNum">
+                  <i class="fas fa-water"></i> Liquidity: {{ formatMoney(market.liquidityNum) }}
+                </span>
+                <span v-if="market.closed">
+                  <i class="fas fa-lock"></i> Closed
+                </span>
+                <span v-if="market.closedTime">
+                  <i class="fas fa-clock"></i> Closed: {{ formatDate(market.closedTime) }}
+                </span>
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- Additional Stats -->
-          <div class="extra-stats">
-            <span class="volume" v-if="market.volume">
-              <i class="fas fa-dollar-sign"></i> Vol: {{ formatMoney(market.volume) }}
-            </span>
-            <span v-if="market.liquidity">
-              <i class="fas fa-water"></i> Liq: {{ formatMoney(market.liquidity) }}
-            </span>
-            <span v-if="market.active !== undefined">
-              <i class="fas fa-chart-line"></i> {{ market.active ? 'Active' : 'Closed' }}
-            </span>
+        <!-- Series Info (if available) -->
+        <div class="series-info" v-if="event.series && event.series.length">
+          <div class="series-tag" v-for="series in event.series" :key="series.id">
+            <i class="fas fa-layer-group"></i> {{ series.title }}
           </div>
         </div>
+
+        <!-- Tags -->
+        <div class="tags-section" v-if="event.tags && event.tags.length">
+          <div class="tag" v-for="tag in event.tags" :key="tag.id">
+            <i class="fas fa-hashtag"></i> {{ tag.label }}
+          </div>
+        </div>
+
+        <!-- Comment Count -->
+        <div class="event-footer" v-if="event.commentCount">
+          <i class="fas fa-comments"></i> {{ event.commentCount.toLocaleString() }} comments
+        </div>
       </div>
+    </div>
+
+    <!-- Pagination / Next Cursor -->
+    <div class="pagination" v-if="nextCursor && !loading && events.length > 0">
+      <button @click="loadMore" class="load-more-btn">
+        <i class="fas fa-arrow-down"></i> Load More Events
+      </button>
     </div>
 
     <!-- Footer -->
@@ -146,22 +206,26 @@
 import { ref, computed, onMounted } from 'vue'
 
 export default {
-  name: 'Polymarket',
+  name: 'PolymarketEvents',
   setup() {
     // Reactive data
-    const markets = ref([])
+    const events = ref([])
     const loading = ref(false)
     const error = ref(null)
     const lastUpdated = ref(null)
     const searchQuery = ref('')
     const activeStatusFilter = ref('all')
+    const selectedCategory = ref('all')
+    const nextCursor = ref(null)
+    const limit = ref(20)
+    const ascending = ref(false)
 
     // Filter options
     const statusFilters = [
-      { label: 'All Markets', value: 'all' },
+      { label: 'All', value: 'all' },
       { label: 'Active', value: 'active' },
-      { label: 'Resolved', value: 'resolved' },
-      { label: 'Ended', value: 'ended' }
+      { label: 'Closed', value: 'closed' },
+      { label: 'Archived', value: 'archived' }
     ]
 
     // Helper Functions
@@ -180,25 +244,49 @@ export default {
       }
     }
 
-    const getMarketStatus = (market) => {
-      if (market.resolved === true || market.resolvedAt) return 'resolved'
-      if (market.closed === true || (market.endDate && new Date(market.endDate) < new Date())) return 'ended'
-      if (market.active === false) return 'ended'
-      return 'active'
+    const getEventStatus = (event) => {
+      if (event.archived) return 'Archived'
+      if (event.closed) return 'Closed'
+      if (event.active) return 'Active'
+      return 'Unknown'
     }
 
-    const formatStatus = (market) => {
-      const status = getMarketStatus(market)
-      if (status === 'resolved') return 'Resolved'
-      if (status === 'ended') return 'Ended'
-      return 'Active'
+    const getEventStatusClass = (event) => {
+      if (event.archived) return 'archived'
+      if (event.closed) return 'closed'
+      if (event.active) return 'active'
+      return ''
     }
 
-    const marketStatusClass = (market) => {
-      const status = getMarketStatus(market)
-      if (status === 'resolved') return 'resolved'
-      if (status === 'ended') return 'ended'
-      return 'active'
+    const parseOutcomes = (outcomesStr) => {
+      if (!outcomesStr) return []
+      try {
+        if (typeof outcomesStr === 'string') {
+          return JSON.parse(outcomesStr)
+        }
+        if (Array.isArray(outcomesStr)) {
+          return outcomesStr
+        }
+        return []
+      } catch(e) {
+        return []
+      }
+    }
+
+    const getOutcomePrice = (market, idx) => {
+      if (!market.outcomePrices) return null
+      try {
+        let prices = market.outcomePrices
+        if (typeof prices === 'string') {
+          prices = JSON.parse(prices)
+        }
+        if (Array.isArray(prices) && prices[idx]) {
+          return parseFloat(prices[idx])
+        }
+        return null
+      } catch(e) {
+        return null
+      }
     }
 
     const formatPercent = (prob) => {
@@ -216,12 +304,22 @@ export default {
     }
 
     const isHighestProb = (market, idx) => {
-      if (!market.probabilities || market.probabilities.length === 0) return false
-      const probs = market.probabilities.map(p => typeof p === 'number' ? p : parseFloat(p))
-      const current = probs[idx]
-      if (current === undefined || isNaN(current)) return false
-      const maxProb = Math.max(...probs.filter(p => !isNaN(p)))
-      return current === maxProb && maxProb > 0
+      if (!market.outcomePrices) return false
+      try {
+        let prices = market.outcomePrices
+        if (typeof prices === 'string') {
+          prices = JSON.parse(prices)
+        }
+        if (!Array.isArray(prices)) return false
+        
+        const probs = prices.map(p => parseFloat(p))
+        const current = probs[idx]
+        if (current === undefined || isNaN(current)) return false
+        const maxProb = Math.max(...probs.filter(p => !isNaN(p)))
+        return current === maxProb && maxProb > 0
+      } catch(e) {
+        return false
+      }
     }
 
     const formatMoney = (value) => {
@@ -238,136 +336,178 @@ export default {
       return str.length > len ? str.substring(0, len) + '…' : str
     }
 
-    // API Fetch Function
-    const fetchMarkets = async () => {
-      loading.value = true
-      error.value = null
-      
-      try {
-        const url = 'https://gamma-api.polymarket.com/events?active=true&closed=false&order=volume_24hr&ascending=false'
-        const response = await fetch(url)
-        
-        if (!response.ok) throw new Error(`API responded with status ${response.status}`)
-        
-        const data = await response.json()
-        
-        if (!Array.isArray(data)) throw new Error('Unexpected API format')
+    // Computed: Unique categories
+    const uniqueCategories = computed(() => {
+      const cats = new Set()
+      events.value.forEach(event => {
+        if (event.category) cats.add(event.category)
+      })
+      return Array.from(cats).sort()
+    })
 
-        // Transform API data to uniform structure
-        const enrichedMarkets = data.map(m => {
-          let outcomes = []
-          let probabilities = []
-          
-          // Parse outcomes from Polymarket API
-          if (m.outcomes && Array.isArray(m.outcomes)) {
-            outcomes = m.outcomes.map(out => {
-              if (typeof out === 'string') return { name: out, ticker: null }
-              return { name: out.name || out, ticker: out.ticker || null }
-            })
-            
-            if (m.outcomePrices && Array.isArray(m.outcomePrices)) {
-              probabilities = m.outcomePrices.map(p => {
-                if (p === undefined) return null
-                const priceNum = parseFloat(p)
-                return isNaN(priceNum) ? null : priceNum
-              })
-            } else {
-              probabilities = outcomes.map(() => null)
-            }
-          } 
-          // Fallback for binary markets
-          else if (m.price !== undefined && m.negPrice !== undefined) {
-            outcomes = [{ name: m.outcome || 'Yes' }, { name: m.outcomeNegative || 'No' }]
-            probabilities = [parseFloat(m.price) || 0, parseFloat(m.negPrice) || 0]
-          } 
-          else if (m.probability !== undefined && !isNaN(m.probability)) {
-            outcomes = [{ name: 'Yes' }, { name: 'No' }]
-            const yesProb = parseFloat(m.probability)
-            probabilities = [yesProb, 1 - yesProb]
-          }
+    // Computed: Total volume
+    const totalVolume = computed(() => {
+      return events.value.reduce((sum, event) => sum + (parseFloat(event.volume) || 0), 0)
+    })
 
-          // Normalize probabilities
-          if (probabilities.length) {
-            probabilities = probabilities.map(p => 
-              (p !== null && !isNaN(p)) ? Math.min(1, Math.max(0, p)) : null
-            )
-          }
-
-          return {
-            id: m.id || m.marketId || m.slug || Math.random().toString(36),
-            question: m.question || m.title || m.description_short || m.name || 'Polymarket question',
-            title: m.title || m.question,
-            description: m.description || m.description_short || '',
-            outcomes: outcomes,
-            probabilities: probabilities,
-            volume: m.volume24hr || m.volume || m.volumeUSD || null,
-            liquidity: m.liquidity || m.liquidityUSD || null,
-            endDate: m.endDate || m.end_date || m.expiration || null,
-            resolved: m.resolved === true || m.resolvedAt !== undefined,
-            closed: m.closed === true || (m.endDate && new Date(m.endDate) < new Date()),
-            active: m.active !== undefined ? m.active : (!m.closed && !m.resolved),
-            ticker: m.ticker || null,
-            raw: m
-          }
-        })
-
-        markets.value = enrichedMarkets
-        lastUpdated.value = new Date().toLocaleTimeString()
-        loading.value = false
-      } catch (err) {
-        console.error('Polymarket API error:', err)
-        error.value = `Failed to load markets: ${err.message}. Please try again later.`
-        loading.value = false
-      }
-    }
-
-    // Computed: Filtered markets based on search & status
-    const filteredMarkets = computed(() => {
-      let result = markets.value
+    // Computed: Filtered events
+    const filteredEvents = computed(() => {
+      let result = events.value
       
       // Status filter
       if (activeStatusFilter.value !== 'all') {
-        result = result.filter(m => getMarketStatus(m) === activeStatusFilter.value)
+        result = result.filter(event => {
+          if (activeStatusFilter.value === 'active') return event.active && !event.closed
+          if (activeStatusFilter.value === 'closed') return event.closed
+          if (activeStatusFilter.value === 'archived') return event.archived
+          return true
+        })
+      }
+      
+      // Category filter
+      if (selectedCategory.value !== 'all') {
+        result = result.filter(event => event.category === selectedCategory.value)
       }
       
       // Search filter
       if (searchQuery.value.trim()) {
         const lowerQuery = searchQuery.value.toLowerCase()
-        result = result.filter(m => {
-          const matchQuestion = m.question?.toLowerCase().includes(lowerQuery)
-          const matchDesc = m.description?.toLowerCase().includes(lowerQuery)
-          const matchOutcome = m.outcomes?.some(out => out.name?.toLowerCase().includes(lowerQuery))
-          return matchQuestion || matchDesc || matchOutcome
+        result = result.filter(event => {
+          const matchTitle = event.title?.toLowerCase().includes(lowerQuery)
+          const matchDesc = event.description?.toLowerCase().includes(lowerQuery)
+          const matchTicker = event.ticker?.toLowerCase().includes(lowerQuery)
+          const matchMarkets = event.markets?.some(m => 
+            m.question?.toLowerCase().includes(lowerQuery)
+          )
+          return matchTitle || matchDesc || matchTicker || matchMarkets
         })
       }
       
       return result
     })
 
+    // API Fetch Function using the exact request format you provided
+    const fetchEvents = async (cursor = null) => {
+      loading.value = true
+      error.value = null
+      
+      try {
+        // Build the request body matching your format
+        const requestBody = {
+          method: "GET",
+          url: "https://gamma-api.polymarket.com/events",
+          body: {
+            default: true
+          }
+        }
+        
+        // Add query parameters
+        const params = new URLSearchParams()
+        params.append('limit', limit.value.toString())
+        params.append('ascending', ascending.value.toString())
+        
+        if (cursor) {
+          params.append('cursor', cursor)
+        }
+        
+        const fullUrl = `${requestBody.url}?${params.toString()}`
+        
+        // Make the request to Polymarket Gamma API directly
+        const response = await fetch(fullUrl, {
+          method: requestBody.method,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error(`API responded with status ${response.status}: ${response.statusText}`)
+        }
+        
+        const data = await response.json()
+        
+        // Handle the response structure
+        let eventsData = data.events || data
+        
+        if (!eventsData || !Array.isArray(eventsData)) {
+          throw new Error('Unexpected API format from Polymarket')
+        }
+
+        // Transform and enrich events data
+        const enrichedEvents = eventsData.map(event => ({
+          ...event,
+          // Ensure markets is always an array
+          markets: event.markets || [],
+          // Parse numeric values
+          volumeNum: parseFloat(event.volume) || 0,
+          liquidityNum: parseFloat(event.liquidity) || 0,
+          // Add display title
+          displayTitle: event.title || event.ticker?.replace(/-/g, ' ') || 'Untitled Event'
+        }))
+
+        if (cursor) {
+          // Append to existing events
+          events.value = [...events.value, ...enrichedEvents]
+        } else {
+          // Replace all events
+          events.value = enrichedEvents
+        }
+        
+        // Get next cursor from response
+        nextCursor.value = data.next_cursor || null
+        lastUpdated.value = new Date().toLocaleString()
+        loading.value = false
+      } catch (err) {
+        console.error('Polymarket Gamma API error:', err)
+        error.value = `Failed to load events: ${err.message}. Please check your connection and try again.`
+        loading.value = false
+      }
+    }
+
+    const loadMore = () => {
+      if (nextCursor.value && !loading.value) {
+        fetchEvents(nextCursor.value)
+      }
+    }
+
+    const refreshEvents = () => {
+      nextCursor.value = null
+      fetchEvents()
+    }
+
     // Lifecycle
     onMounted(() => {
-      fetchMarkets()
+      fetchEvents()
     })
 
     return {
-      markets,
+      events,
       loading,
       error,
       lastUpdated,
       searchQuery,
       activeStatusFilter,
+      selectedCategory,
+      limit,
+      ascending,
       statusFilters,
-      filteredMarkets,
-      fetchMarkets,
+      uniqueCategories,
+      filteredEvents,
+      totalVolume,
+      nextCursor,
+      refreshEvents,
+      loadMore,
       formatDate,
-      formatStatus,
-      marketStatusClass,
+      getEventStatus,
+      getEventStatusClass,
+      parseOutcomes,
+      getOutcomePrice,
       formatPercent,
       getProbWidth,
       isHighestProb,
       formatMoney,
-      truncate,
-      getMarketStatus
+      truncate
     }
   }
 }
@@ -454,6 +594,40 @@ export default {
   font-family: inherit;
 }
 
+.limit-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.limit-select {
+  padding: 0.4rem 0.8rem;
+  border-radius: 40px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+}
+
+.category-filter {
+  min-width: 150px;
+}
+
+.category-select {
+  width: 100%;
+  padding: 0.5rem 1rem;
+  border-radius: 40px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  outline: none;
+}
+
 .status-filter {
   display: flex;
   gap: 0.5rem;
@@ -516,50 +690,69 @@ export default {
   font-size: 0.85rem;
   font-weight: 500;
   border: 1px solid #eef2ff;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.markets-grid {
+.events-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: 1fr;
   gap: 1.8rem;
 }
 
-.market-card {
+.event-card {
   background: white;
   border-radius: 28px;
   box-shadow: 0 8px 20px rgba(0,0,0,0.03), 0 2px 4px rgba(0,0,0,0.05);
   transition: transform 0.2s, box-shadow 0.2s;
   overflow: hidden;
   border: 1px solid #eef2ff;
-  display: flex;
-  flex-direction: column;
 }
 
-.market-card:hover {
-  transform: translateY(-4px);
+.event-card:hover {
+  transform: translateY(-2px);
   box-shadow: 0 20px 30px -12px rgba(0,0,0,0.1);
   border-color: #cbd5e1;
 }
 
-.card-header {
-  padding: 1.2rem 1.4rem 0.6rem 1.4rem;
-  border-bottom: 1px solid #f1f5f9;
+.event-header {
+  padding: 1.5rem 1.8rem;
+  background: linear-gradient(135deg, #f8fafc, #ffffff);
+  border-bottom: 1px solid #eef2ff;
 }
 
-.question {
-  font-size: 1.1rem;
+.event-category {
+  display: inline-block;
+  background: #eef2ff;
+  padding: 0.2rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #1e40af;
+  margin-bottom: 0.8rem;
+}
+
+.event-title {
+  font-size: 1.3rem;
   font-weight: 700;
-  line-height: 1.4;
   color: #0f172a;
   margin-bottom: 0.5rem;
+  line-height: 1.3;
 }
 
-.meta-info {
+.event-description {
+  color: #475569;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin: 0.5rem 0;
+}
+
+.event-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 0.5rem 0 0.3rem;
-  font-size: 0.7rem;
+  gap: 1rem;
+  margin-top: 0.8rem;
+  font-size: 0.75rem;
   color: #5b6e8c;
 }
 
@@ -569,31 +762,63 @@ export default {
   font-size: 0.65rem;
   padding: 0.2rem 0.6rem;
   border-radius: 30px;
-  background: #eef2ff;
 }
 
-.status.resolved { 
+.status.active { 
   background: #dcfce7; 
   color: #15803d; 
 }
 
-.status.active { 
-  background: #fff3e3; 
-  color: #b45309; 
-}
-
-.status.ended { 
+.status.closed { 
   background: #f1f5f9; 
   color: #475569; 
 }
 
-.outcome-area {
-  padding: 1rem 1.4rem;
-  flex: 1;
+.status.archived { 
+  background: #fef3c7; 
+  color: #92400e; 
+}
+
+.markets-section {
+  padding: 1.2rem 1.8rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.section-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #3b82f6;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.market-item {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.market-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.market-question {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #1e293b;
+  margin-bottom: 0.8rem;
+}
+
+.outcomes-area {
+  margin-top: 0.5rem;
 }
 
 .poll-option {
-  margin-bottom: 1rem;
+  margin-bottom: 0.8rem;
 }
 
 .option-label {
@@ -608,7 +833,7 @@ export default {
 .prob-bar-bg {
   background: #e2e8f0;
   border-radius: 40px;
-  height: 10px;
+  height: 8px;
   overflow: hidden;
   width: 100%;
 }
@@ -625,28 +850,76 @@ export default {
   background: linear-gradient(90deg, #10b981, #059669);
 }
 
-.description-text {
-  font-size: 0.8rem;
-  color: #475569;
-  margin-top: 0.3rem;
-}
-
-.fallback-probability {
-  margin-top: 0.6rem;
-}
-
-.extra-stats {
+.market-stats {
   display: flex;
-  justify-content: space-between;
-  margin-top: 0.7rem;
+  gap: 1rem;
+  margin-top: 0.8rem;
   font-size: 0.7rem;
-  color: #4b5563;
-  border-top: 1px solid #f1f5f9;
-  padding-top: 0.7rem;
+  color: #6c757d;
+  flex-wrap: wrap;
 }
 
-.volume {
+.series-info {
+  padding: 0.8rem 1.8rem;
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.series-tag {
+  background: #f1f5f9;
+  padding: 0.2rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  color: #475569;
+}
+
+.tags-section {
+  padding: 0.8rem 1.8rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.tag {
+  background: #eef2ff;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.65rem;
+  color: #1e40af;
+}
+
+.event-footer {
+  padding: 0.8rem 1.8rem;
+  font-size: 0.75rem;
+  color: #6c757d;
+  background: #fafcfc;
+}
+
+.pagination {
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.load-more-btn {
+  background: #1e293b;
+  border: none;
+  color: white;
+  padding: 0.75rem 2rem;
+  border-radius: 40px;
   font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: 0.2s;
+  font-family: inherit;
+}
+
+.load-more-btn:hover {
+  background: #0f172a;
 }
 
 .loading-state, 
@@ -683,7 +956,7 @@ footer {
   padding: 1rem;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 768px) {
   .controls {
     flex-direction: column;
     align-items: stretch;
@@ -694,8 +967,18 @@ footer {
     justify-content: center;
   }
   
-  .markets-grid {
-    grid-template-columns: 1fr;
+  .event-title {
+    font-size: 1.1rem;
+  }
+  
+  .stats {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .limit-control {
+    justify-content: space-between;
   }
 }
-</style>
+</style> -->
