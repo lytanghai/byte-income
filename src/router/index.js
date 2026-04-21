@@ -14,6 +14,7 @@ import Configuration from '../views/Configuration.vue'
 
 // Import the token check function
 import Calculator from '../views/Calculator.vue'
+import Polymarket from '../views/Polymarket.vue'
 
 const routes = [
   {
@@ -36,6 +37,7 @@ const routes = [
       { path: 'market', name: 'Market', component: Market },
       { path: 'report', name: 'Report', component: Report },
       { path: 'calculator', name: 'Calculator', component: Calculator},
+      { path: 'polymarket', name: 'Polymarket', component: Polymarket},
       { path: 'setting/users', name: 'Users', component: Users },
       { path: 'setting/configuration', name: 'Configuration', component: Configuration },
     ]

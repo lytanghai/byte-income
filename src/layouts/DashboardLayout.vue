@@ -26,6 +26,9 @@
                         <span class="menu-text">Market</span>
                         <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount }}</span>
                     </RouterLink> -->
+                    <RouterLink @click="closeSidebar" to="/polymarket">
+                        <span class="menu-text">Polymarket</span>
+                    </RouterLink>
                     <RouterLink @click="closeSidebar" to="/report">
                         <span class="menu-text">Report</span>
                     </RouterLink>
