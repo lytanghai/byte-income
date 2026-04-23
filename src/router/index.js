@@ -102,7 +102,7 @@ router.beforeEach((to, from, next) => {
     
     // Redirect to login with message
     // console.log('Token expired, redirecting to login');
-    alert("Token Expired! Please re-login!")
+    // alert("Token Expired! Please re-login!")
     return next('/login');
   }
 
