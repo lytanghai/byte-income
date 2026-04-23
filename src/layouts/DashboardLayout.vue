@@ -22,10 +22,6 @@
                     <RouterLink @click="closeSidebar" to="/insight">
                         <span class="menu-text">Insight</span>
                     </RouterLink>
-                    <!-- <RouterLink @click="closeSidebar" to="/market" class="notification-link">
-                        <span class="menu-text">Market</span>
-                        <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount }}</span>
-                    </RouterLink> -->
                     <RouterLink @click="closeSidebar" to="/polymarket">
                         <span class="menu-text">Polymarket</span>
                     </RouterLink>
@@ -93,12 +89,6 @@
                 </div>
 
                 <div class="header-right">
-                    <!-- Notification Bell (Mobile) -->
-                    <!-- <button class="notification-bell mobile-only" @click="goToMarket">
-                        <span class="bell-icon">🔔</span>
-                        <span v-if="unreadCount > 0" class="bell-badge">{{ unreadCount }}</span>
-                    </button> -->
-
                     <!-- Theme toggle -->
                     <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
                         {{ theme === 'dark' ? '🌙' : '☀️' }}
@@ -149,7 +139,7 @@
                             <span class="session-status">{{ getSessionCountdown('asia') }}</span>
                         </div>
                         <div class="session" :class="{ active: isSessionActive('london') }">
-                            <span class="session-icon">🇬🇧</span>
+                            <span class="session-icon">UK</span>
                             <span class="session-name">London</span>
                             <span class="session-status">{{ getSessionCountdown('london') }}</span>
                         </div>
@@ -189,7 +179,8 @@ let datetimeInterval = null
 
 // Quote state
 const quotes = [
-    "Follow the plan, follow the market"
+    "Follow the plan, follow the market",
+    "𝟬.𝟭 for investment, 𝟏.𝟎 for gambling"
 ]
 
 const currentQuote = ref(quotes[0])
@@ -298,9 +289,9 @@ const currentTimeIcon = computed(() => {
     const hour = currentDateTime.value.getHours()
     
     if (hour >= 5 && hour < 12) {
-        return '🌅' // Morning
+        return '☀️' // Morning
     } else if (hour >= 12 && hour < 17) {
-        return '☀️' // Afternoon
+        return '🔥' // Afternoon
     } else if (hour >= 17 && hour < 20) {
         return '🌆' // Evening
     } else {
@@ -374,11 +365,6 @@ const handleLogout = () => {
     localStorage.removeItem('userData')
     localStorage.removeItem('notification_cache')
     localStorage.removeItem('notification_timestamp')
-    
-    // Stop polling
-    // if (pollingInterval) {
-    //     clearInterval(pollingInterval)
-    // }
     
     // Stop datetime interval
     if (datetimeInterval) {
@@ -507,18 +493,6 @@ const playNotificationSound = () => {
     } catch (err) {
         console.log('Audio not supported')
     }
-}
-
-// Start polling every 30 seconds
-const startPolling = () => {
-    // Load from cache first
-    // loadNotificationsFromCache()
-    
-    // Fetch immediately
-    // fetchUnreadNotifications()
-    
-    // Then poll every 30 seconds
-    // pollingInterval = setInterval(fetchUnreadNotifications, 30000) // 30 seconds
 }
 
 /* Theme toggle */
