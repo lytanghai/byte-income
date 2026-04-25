@@ -27,7 +27,7 @@
                         <span class="menu-text">Calculator</span>
                     </RouterLink>
 
-                    <!-- ANALYSIS MENU - Now uses isAnalysisOpen 👇 -->
+                    <!-- ANALYSIS MENU - Fixed -->
                     <div class="menu-group">
                         <div class="menu-parent" @click="toggleAnalysis">
                             <span class="menu-parent-content">
@@ -48,7 +48,7 @@
                         </div>
                     </div>
                     
-                    <!-- SETTING MENU - Now uses isSettingOpen 👇 -->
+                    <!-- SETTING MENU - Fixed -->
                     <div class="menu-group">
                         <div class="menu-parent" @click="toggleSetting">
                             <span class="menu-parent-content">
@@ -85,22 +85,99 @@
             </div>
         </aside>
 
-        <!-- Rest of your template remains the same... -->
+        <!-- Overlay (mobile) -->
         <div v-if="isSidebarOpen" class="overlay" @click="closeSidebar" />
-        
+
+        <!-- Main -->
         <div class="main">
-            <!-- Header content (same as before) -->
+            <!-- Header with Hamburger Menu -->
             <header class="header">
-                <!-- ... your existing header code ... -->
+                <div class="header-left">
+                    <!-- ✅ HAMBURGER MENU BUTTON - RESTORED -->
+                    <button class="menu-btn" @click="toggleSidebar">☰</button>
+                    <h2 class="page-title mobile-only">{{ currentPageTitle }}</h2>
+                </div>
+
+                <!-- Quote Display - Center -->
+                <div class="header-center">
+                    <div class="quote-container" :class="{ 'quote-fade': isQuoteChanging }">
+                        <span class="quote-icon">💡</span>
+                        <span class="quote-text">{{ currentQuote }}</span>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <!-- Theme toggle -->
+                    <button class="theme-toggle" @click="toggleTheme" :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'">
+                        {{ theme === 'dark' ? '🌙' : '☀️' }}
+                    </button>
+
+                    <!-- Profile section (desktop) -->
+                    <div class="profile desktop-only">
+                        <div class="avatar">?</div>
+                        <span class="username">
+                            {{ (username || 'N/A').toUpperCase() }}
+                        </span>
+                    </div>
+
+                    <!-- Mobile profile button -->
+                    <button class="profile-btn mobile-only" @click="toggleMobileProfile" v-if="!isMobileProfileOpen">
+                        <div class="avatar small">?</div>
+                    </button>
+                </div>
+
+                <!-- Mobile profile dropdown -->
+                <div v-if="isMobileProfileOpen" class="mobile-profile-dropdown">
+                    <div class="mobile-profile-header">
+                        <div class="avatar large">?</div>
+                        <span class="username-large">{{ (username || 'N/A').toUpperCase() }}</span>
+                    </div>
+                    <button class="mobile-logout-btn" @click="handleLogout">
+                        <span>🚪 Logout</span>
+                    </button>
+                    <button class="close-dropdown" @click="toggleMobileProfile">✕</button>
+                </div>
             </header>
-            
+
+            <!-- Content -->
             <main class="content">
-                <!-- ... your existing content ... -->
+                <!-- Datetime and Trading Sessions Widget -->
+                <div class="datetime-session-widget">
+                    <div class="datetime-card">
+                        <div class="datetime-icon">{{ currentTimeIcon }}</div>
+                        <div class="datetime-info">
+                            <div class="date">{{ currentDate }}</div>
+                            <div class="time">{{ currentTime }}</div>
+                        </div>
+                    </div>
+                    <div class="sessions-card">
+                        <div class="session" :class="{ active: isSessionActive('asia') }">
+                            <span class="session-icon">🌏</span>
+                            <span class="session-name">Asia</span>
+                            <span class="session-status">{{ getSessionCountdown('asia') }}</span>
+                        </div>
+                        <div class="session" :class="{ active: isSessionActive('london') }">
+                            <span class="session-icon">UK</span>
+                            <span class="session-name">London</span>
+                            <span class="session-status">{{ getSessionCountdown('london') }}</span>
+                        </div>
+                        <div class="session" :class="{ active: isSessionActive('newyork') }">
+                            <span class="session-icon">🇺🇸</span>
+                            <span class="session-name">New York</span>
+                            <span class="session-status">{{ getSessionCountdown('newyork') }}</span>
+                        </div>
+                    </div>
+                </div>
+                
                 <router-view />
             </main>
         </div>
     </div>
 </template>
+
+<style scoped>
+  @import '../assets/styles/dashboard.css';
+</style>
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
@@ -110,7 +187,7 @@ const router = useRouter()
 const route = useRoute()
 const isSidebarOpen = ref(false)
 const theme = ref('dark')
-// 👇 FIXED: Separate state variables for each menu
+// ✅ FIXED: Separate state variables for Analysis and Setting menus
 const isAnalysisOpen = ref(false)  // For Analysis menu
 const isSettingOpen = ref(false)    // For Setting menu
 const username = ref('')
@@ -202,17 +279,14 @@ const getSessionCountdown = (session) => {
             return 'Closed'
     }
     
-    // Check if currently in session
     if (currentUTC >= start && currentUTC < end) {
         const remainingMinutes = (end - currentUTC) * 60
         return formatCountdown(remainingMinutes)
     } 
-    // Check if before session starts today
     else if (currentUTC < start) {
         const waitMinutes = (start - currentUTC) * 60
         return `Starts in ${formatCountdown(waitMinutes)}`
     } 
-    // After session ends, wait until next day
     else {
         const nextStart = start + 24
         const waitMinutes = (nextStart - currentUTC) * 60
@@ -224,7 +298,6 @@ const getSessionCountdown = (session) => {
 const changeQuote = () => {
     isQuoteChanging.value = true
     
-    // Get random quote different from current
     let newQuote = currentQuote.value
     while (newQuote === currentQuote.value && quotes.length > 1) {
         const randomIndex = Math.floor(Math.random() * quotes.length)
@@ -249,7 +322,7 @@ const currentDate = computed(() => {
     })
 })
 
-// Compute current time in 24-hour format
+// Compute current time
 const currentTime = computed(() => {
     return currentDateTime.value.toLocaleTimeString(undefined, { 
         hour: '2-digit', 
@@ -259,19 +332,14 @@ const currentTime = computed(() => {
     })
 })
 
-// Get time icon based on hour
+// Get time icon
 const currentTimeIcon = computed(() => {
     const hour = currentDateTime.value.getHours()
     
-    if (hour >= 5 && hour < 12) {
-        return '☀️'
-    } else if (hour >= 12 && hour < 17) {
-        return '🔥'
-    } else if (hour >= 17 && hour < 20) {
-        return '🌆'
-    } else {
-        return '🌙'
-    }
+    if (hour >= 5 && hour < 12) return '☀️'
+    else if (hour >= 12 && hour < 17) return '🔥'
+    else if (hour >= 17 && hour < 20) return '🌆'
+    else return '🌙'
 })
 
 // Check if session is active
@@ -282,14 +350,10 @@ const isSessionActive = (session) => {
     const currentUTC = utcHour + utcMinute / 60
     
     switch(session) {
-        case 'asia':
-            return currentUTC >= 0 && currentUTC < 9
-        case 'london':
-            return currentUTC >= 8 && currentUTC < 17
-        case 'newyork':
-            return currentUTC >= 13 && currentUTC < 22
-        default:
-            return false
+        case 'asia': return currentUTC >= 0 && currentUTC < 9
+        case 'london': return currentUTC >= 8 && currentUTC < 17
+        case 'newyork': return currentUTC >= 13 && currentUTC < 22
+        default: return false
     }
 }
 
@@ -302,9 +366,11 @@ const currentPageTitle = computed(() => {
     if (path.includes('market')) return 'Market'
     if (path.includes('report')) return 'Report'
     if (path.includes('setting')) return 'Settings'
+    if (path.includes('tradingview')) return 'Chart'
     return 'Dashboard'
 })
 
+// ✅ Hamburger menu functions (restored)
 const toggleSidebar = () => {
     isSidebarOpen.value = !isSidebarOpen.value
     if (isSidebarOpen.value) {
@@ -316,7 +382,7 @@ const closeSidebar = () => {
     isSidebarOpen.value = false
 }
 
-// 👇 FIXED: Separate toggle functions
+// ✅ Separate toggle functions for menus
 const toggleAnalysis = () => {
     isAnalysisOpen.value = !isAnalysisOpen.value
 }
@@ -345,132 +411,27 @@ const handleLogout = () => {
     localStorage.removeItem('notification_cache')
     localStorage.removeItem('notification_timestamp')
     
-    if (datetimeInterval) {
-        clearInterval(datetimeInterval)
-    }
-    
-    if (quoteInterval) {
-        clearInterval(quoteInterval)
-    }
+    if (datetimeInterval) clearInterval(datetimeInterval)
+    if (quoteInterval) clearInterval(quoteInterval)
     
     router.push('/login')
 }
 
-// Notification polling (keep your existing notification code)
-const NOTIFICATION_API_URL = (import.meta.env.VITE_API__NOTIFICATION_BASE_URL || 'http://localhost:8081') + '/notification/fetch-unread'
-const NOTIFICATION_CACHE_KEY = 'notification_cache'
-const NOTIFICATION_TIMESTAMP_KEY = 'notification_timestamp'
-
-const loadNotificationsFromCache = () => {
-    try {
-        const cached = localStorage.getItem(NOTIFICATION_CACHE_KEY)
-        if (cached) {
-            const data = JSON.parse(cached)
-            notifications.value = data
-            const unread = data.filter(n => !n.has_read).length
-            unreadCount.value = unread
-            console.log('✅ Loaded notifications from cache:', data.length, 'unread:', unread)
-            return true
-        }
-    } catch (err) {
-        console.error('Failed to load notifications from cache:', err)
-    }
-    return false
-}
-
-const saveNotificationsToCache = (data) => {
-    try {
-        localStorage.setItem(NOTIFICATION_CACHE_KEY, JSON.stringify(data))
-        localStorage.setItem(NOTIFICATION_TIMESTAMP_KEY, new Date().toISOString())
-        const unread = data.filter(n => !n.has_read).length
-        unreadCount.value = unread
-    } catch (err) {
-        console.error('Failed to save notifications to cache:', err)
-    }
-}
-
-const updateUnreadCountFromCache = () => {
-    try {
-        const cached = localStorage.getItem(NOTIFICATION_CACHE_KEY)
-        if (cached) {
-            const data = JSON.parse(cached)
-            const unread = data.filter(n => !n.has_read).length
-            unreadCount.value = unread
-            notifications.value = data
-            console.log('🔄 Updated unread count from cache:', unread)
-        }
-    } catch (err) {
-        console.error('Failed to update from cache:', err)
-    }
-}
-
-const fetchUnreadNotifications = async () => {
-    const token = localStorage.getItem('authToken')
-    if (!token) return
-
-    try {
-        const response = await fetch(NOTIFICATION_API_URL, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        })
-
-        const result = await response.json()
-
-        if (result.code === '200' && result.data) {
-            const newNotifications = result.data
-            const newUnreadCount = newNotifications.filter(n => !n.has_read).length
-            
-            if (newUnreadCount !== unreadCount.value) {
-                console.log(`📬 Notification count changed: ${unreadCount.value} → ${newUnreadCount}`)
-                if (newUnreadCount > unreadCount.value && newUnreadCount > 0) {
-                    playNotificationSound()
-                }
-            }
-            
-            notifications.value = newNotifications
-            unreadCount.value = newUnreadCount
-            saveNotificationsToCache(newNotifications)
-        }
-    } catch (err) {
-        console.error('Failed to fetch notifications:', err)
-    }
-}
-
-const playNotificationSound = () => {
-    try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-        const oscillator = audioContext.createOscillator()
-        const gainNode = audioContext.createGain()
-        
-        oscillator.connect(gainNode)
-        gainNode.connect(audioContext.destination)
-        
-        oscillator.frequency.value = 800
-        gainNode.gain.value = 0.1
-        
-        oscillator.start()
-        oscillator.stop(audioContext.currentTime + 0.1)
-    } catch (err) {
-        console.log('Audio not supported')
-    }
-}
-
-/* Theme toggle */
+// Theme toggle
 const toggleTheme = () => {
     theme.value = theme.value === 'light' ? 'dark' : 'light'
     localStorage.setItem('theme', theme.value)
 }
 
 // Watch for route changes
-watch(() => route.path, (newPath) => {
-    if (newPath === '/market') {
-        setTimeout(updateUnreadCountFromCache, 500)
+watch(() => route.path, () => {
+    if (window.innerWidth <= 768) {
+        isSidebarOpen.value = false
+        isMobileProfileOpen.value = false
     }
 })
 
+// Lifecycle hooks
 onMounted(() => {
     const savedTheme = localStorage.getItem('theme')
     if (savedTheme) theme.value = savedTheme
@@ -493,19 +454,7 @@ onMounted(() => {
         changeQuote()
     }, 10000)
 
-    window.addEventListener('storage', (e) => {
-        if (e.key === NOTIFICATION_CACHE_KEY) {
-            updateUnreadCountFromCache()
-        }
-    })
-
-    router.afterEach(() => {
-        if (window.innerWidth <= 768) {
-            isSidebarOpen.value = false
-            isMobileProfileOpen.value = false
-        }
-    })
-
+    // Close sidebar on resize if screen becomes desktop
     window.addEventListener('resize', () => {
         if (window.innerWidth > 768) {
             isSidebarOpen.value = false
@@ -515,17 +464,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-    if (datetimeInterval) {
-        clearInterval(datetimeInterval)
-    }
-    
-    if (quoteInterval) {
-        clearInterval(quoteInterval)
-    }
-    
-    window.removeEventListener('storage', updateUnreadCountFromCache)
+    if (datetimeInterval) clearInterval(datetimeInterval)
+    if (quoteInterval) clearInterval(quoteInterval)
 })
 </script>
-<style scoped>
-  @import '../assets/styles/dashboard.css';
-</style>
