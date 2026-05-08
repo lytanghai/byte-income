@@ -331,7 +331,7 @@
             <div class="gap-label">Price Gap</div>
             <div class="gap-value">
               {{ analysisData.gap > 0 ? '+' : '' }}{{ formatNumber(analysisData.gap) }}
-              <span class="gap-percent">({{ calculateGapPercent(analysisData.gap, analysisData.opening_price) }}%)</span>
+              <span class="gap-percent">({{ calculateGapPercent(analysisData.gap, analysisData.opening_price) }})</span>
             </div>
           </div>
           
