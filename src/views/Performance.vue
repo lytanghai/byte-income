@@ -19,7 +19,34 @@
           </option>
         </select>
       </div>
-      
+
+      <!-- Add this inside the calendar-controls div, after the date-selector -->
+      <div class="calendar-controls">
+        <div class="date-selector">
+          <select v-model="selectedMonth" @change="fetchMonthlyPerformance" class="month-select">
+            <option v-for="month in months" :key="month.value" :value="month.value">
+              {{ month.label }}
+            </option>
+          </select>
+          <select v-model="selectedYear" @change="fetchMonthlyPerformance" class="year-select">
+            <option v-for="year in years" :key="year" :value="year">
+              {{ year }}
+            </option>
+          </select>
+        </div>
+
+        <!-- NEW: Recovery Phase Button -->
+        <button @click="showRecoveryPopup" class="recovery-btn" :disabled="recoveryLoading">
+          <span v-if="recoveryLoading" class="btn-spinner"></span>
+          <span v-else>🔄 Recovery Phase</span>
+        </button>
+
+        <!-- Rest of your existing summary-stats -->
+        <div class="summary-stats" v-if="monthlyStats">
+          <!-- ... existing stats ... -->
+        </div>
+      </div>
+
       <div class="summary-stats" v-if="monthlyStats">
         <div class="stat-card">
           <span class="stat-label">Total P&L</span>
@@ -52,40 +79,44 @@
         <div class="streak-icon winning">🔥</div>
         <div class="streak-content">
           <span class="streak-label">Current Win Streak</span>
-          <span class="streak-value winning">{{ streakStats.currentWinStreak }} day{{ streakStats.currentWinStreak !== 1 ? 's' : '' }}</span>
+          <span class="streak-value winning">{{ streakStats.currentWinStreak }} day{{ streakStats.currentWinStreak !== 1
+            ? 's' : '' }}</span>
           <span class="streak-dates" v-if="streakStats.currentWinStart && streakStats.currentWinEnd">
             {{ formatDateShort(streakStats.currentWinStart) }} - {{ formatDateShort(streakStats.currentWinEnd) }}
           </span>
         </div>
       </div>
-      
+
       <div class="streak-card">
         <div class="streak-icon losing">💔</div>
         <div class="streak-content">
           <span class="streak-label">Current Loss Streak</span>
-          <span class="streak-value losing">{{ streakStats.currentLossStreak }} day{{ streakStats.currentLossStreak !== 1 ? 's' : '' }}</span>
+          <span class="streak-value losing">{{ streakStats.currentLossStreak }} day{{ streakStats.currentLossStreak !==
+            1 ? 's' : '' }}</span>
           <span class="streak-dates" v-if="streakStats.currentLossStart && streakStats.currentLossEnd">
             {{ formatDateShort(streakStats.currentLossStart) }} - {{ formatDateShort(streakStats.currentLossEnd) }}
           </span>
         </div>
       </div>
-      
+
       <div class="streak-card">
         <div class="streak-icon record">🏆</div>
         <div class="streak-content">
           <span class="streak-label">Longest Win Streak</span>
-          <span class="streak-value record">{{ streakStats.longestWinStreak }} day{{ streakStats.longestWinStreak !== 1 ? 's' : '' }}</span>
+          <span class="streak-value record">{{ streakStats.longestWinStreak }} day{{ streakStats.longestWinStreak !== 1
+            ? 's' : '' }}</span>
           <span class="streak-dates" v-if="streakStats.longestWinStart && streakStats.longestWinEnd">
             {{ formatDateShort(streakStats.longestWinStart) }} - {{ formatDateShort(streakStats.longestWinEnd) }}
           </span>
         </div>
       </div>
-      
+
       <div class="streak-card">
         <div class="streak-icon worst">📉</div>
         <div class="streak-content">
           <span class="streak-label">Longest Loss Streak</span>
-          <span class="streak-value worst">{{ streakStats.longestLossStreak }} day{{ streakStats.longestLossStreak !== 1 ? 's' : '' }}</span>
+          <span class="streak-value worst">{{ streakStats.longestLossStreak }} day{{ streakStats.longestLossStreak !== 1
+            ? 's' : '' }}</span>
           <span class="streak-dates" v-if="streakStats.longestLossStart && streakStats.longestLossEnd">
             {{ formatDateShort(streakStats.longestLossStart) }} - {{ formatDateShort(streakStats.longestLossEnd) }}
           </span>
@@ -122,18 +153,13 @@
           <div class="weekdays">
             <span v-for="day in weekdays" :key="day">{{ day }}</span>
           </div>
-          
+
           <!-- Empty cells for days before month starts -->
-          <div v-for="n in startDayOffset" :key="'empty-'+n" class="calendar-day empty"></div>
-          
+          <div v-for="n in startDayOffset" :key="'empty-' + n" class="calendar-day empty"></div>
+
           <!-- Actual days -->
-          <div 
-            v-for="day in calendarDays" 
-            :key="day.day"
-            class="calendar-day"
-            :class="getDayClass(day)"
-            @click="selectDay(day)"
-          >
+          <div v-for="day in calendarDays" :key="day.day" class="calendar-day" :class="getDayClass(day)"
+            @click="selectDay(day)">
             <span class="day-number">{{ day.day }}</span>
             <span class="day-pnl">¢{{ formatMoney(day.pnl) }}</span>
           </div>
@@ -144,7 +170,7 @@
           <div class="mobile-stats-grid">
             <div class="mobile-stat-item">
               <span class="mobile-stat-label">Best Day</span>
-              <span class="mobile-stat-value profit">¢{{formatMoney(monthlyStats.bestDay.toFixed(2)) }}</span>
+              <span class="mobile-stat-value profit">¢{{ formatMoney(monthlyStats.bestDay.toFixed(2)) }}</span>
             </div>
             <div class="mobile-stat-item">
               <span class="mobile-stat-label">Worst Day</span>
@@ -170,7 +196,7 @@
             <h3>Filter Transactions</h3>
             <button class="close-filters" @click="toggleFilters">✕</button>
           </div>
-          
+
           <select v-model="transactionFilter.type" @change="fetchTransactions" class="filter-select">
             <option value="">All Types</option>
             <option value="PROFIT">Profit</option>
@@ -178,7 +204,7 @@
             <option value="DEPOSIT">Deposit</option>
             <option value="WITHDRAWAL">Withdrawal</option>
           </select>
-          
+
           <select v-model="transactionFilter.currency" @change="fetchTransactions" class="filter-select">
             <option value="">All Currencies</option>
             <option value="USDC">USDC</option>
@@ -187,12 +213,8 @@
           </select>
 
           <div class="search-wrapper">
-            <input 
-              v-model="transactionFilter.symbol" 
-              @input="debouncedFetchTransactions"
-              placeholder="Search symbol..."
-              class="filter-input"
-            />
+            <input v-model="transactionFilter.symbol" @input="debouncedFetchTransactions" placeholder="Search symbol..."
+              class="filter-input" />
             <span class="search-icon">🔍</span>
           </div>
 
@@ -228,13 +250,9 @@
           <div v-if="transactions.length === 0" class="no-data">
             No transactions found for this period
           </div>
-          
-          <div 
-            v-for="transaction in transactions" 
-            :key="transaction.id" 
-            class="transaction-card"
-            :class="transaction.type?.toLowerCase()"
-          >
+
+          <div v-for="transaction in transactions" :key="transaction.id" class="transaction-card"
+            :class="transaction.type?.toLowerCase()">
             <div class="transaction-header">
               <div class="transaction-left">
                 <span class="transaction-type">{{ transaction.type }}</span>
@@ -242,15 +260,12 @@
               </div>
               <span class="transaction-date">{{ formatTransactionDate(transaction.date) }}</span>
             </div>
-            
+
             <div class="transaction-details">
               <div class="detail-row">
                 <div class="detail-item">
                   <span class="detail-label">{{ getAmountLabel(transaction.type) }}</span>
-                  <span 
-                    class="detail-value amount" 
-                    :class="getAmountClass(transaction)"
-                  >
+                  <span class="detail-value amount" :class="getAmountClass(transaction)">
                     {{ formatTransactionAmount(transaction) }}
                   </span>
                 </div>
@@ -262,6 +277,109 @@
           <div v-if="hasMoreTransactions" class="load-more">
             <button @click="loadMoreTransactions" class="btn-load-more" :disabled="transactionsLoading">
               {{ transactionsLoading ? 'Loading...' : 'Load More Transactions' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Recovery Phase Modal -->
+    <div v-if="showRecoveryModal" class="modal-overlay" @click.self="closeRecoveryModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>💰 Recovery Phase Progress</h2>
+          <button class="modal-close" @click="closeRecoveryModal">✕</button>
+        </div>
+
+        <div v-if="recoveryLoading" class="modal-loading">
+          <div class="spinner"></div>
+          <p>Calculating recovery data...</p>
+        </div>
+
+        <div v-else-if="recoveryError" class="modal-error">
+          <p class="error-message">{{ recoveryError }}</p>
+          <button @click="fetchRecoveryData" class="btn-retry">Retry</button>
+        </div>
+
+        <div v-else-if="recoveryData" class="modal-body">
+          <!-- Progress Circle -->
+          <div class="progress-circle-container">
+            <div class="progress-circle"
+              :style="{ background: `conic-gradient(#10b981 0deg ${recoveryPercentageDeg}deg, #e5e7eb ${recoveryPercentageDeg}deg 360deg)` }">
+              <div class="progress-inner">
+                <span class="progress-percentage">{{ recoveryData.recoveryPercentage.toFixed(1) }}%</span>
+                <span class="progress-label">Recovered</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stats Grid -->
+          <div class="recovery-stats">
+            <div class="recovery-stat-card">
+              <span class="stat-icon">💸</span>
+              <div class="stat-info">
+                <span class="stat-label">Total Debt</span>
+                <span class="stat-value debt">{{ formatCurrency(recoveryData.totalDebt) }}</span>
+              </div>
+            </div>
+
+            <div class="recovery-stat-card">
+              <span class="stat-icon">📈</span>
+              <div class="stat-info">
+                <span class="stat-label">Total Profit</span>
+                <span class="stat-value profit">{{ formatCurrency(recoveryData.totalProfit) }}</span>
+              </div>
+            </div>
+
+            <div class="recovery-stat-card">
+              <span class="stat-icon">📉</span>
+              <div class="stat-info">
+                <span class="stat-label">Total Loss</span>
+                <span class="stat-value loss">{{ formatCurrency(recoveryData.totalLoss) }}</span>
+              </div>
+            </div>
+
+            <div class="recovery-stat-card">
+              <span class="stat-icon">✅</span>
+              <div class="stat-info">
+                <span class="stat-label">Recovered Amount</span>
+                <span class="stat-value recovered">{{ formatCurrency(recoveryData.recoveredAmount) }}</span>
+              </div>
+            </div>
+
+            <div class="recovery-stat-card">
+              <span class="stat-icon">⏳</span>
+              <div class="stat-info">
+                <span class="stat-label">Remaining Debt</span>
+                <span class="stat-value remaining">{{ formatCurrency(recoveryData.remainingDebt) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="progress-bar-container">
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" :style="{ width: recoveryData.recoveryPercentage + '%' }"></div>
+            </div>
+            <div class="progress-bar-labels">
+              <span>0%</span>
+              <span>25%</span>
+              <span>50%</span>
+              <span>75%</span>
+              <span>100%</span>
+            </div>
+          </div>
+
+          <!-- Status Message -->
+          <div class="status-message" :class="getStatusClass()">
+            <span class="status-icon">{{ getStatusIcon() }}</span>
+            <span class="status-text">{{ getStatusMessage() }}</span>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="modal-actions">
+            <button @click="closeRecoveryModal" class="btn-close">Close</button>
+            <button @click="fetchRecoveryData" class="btn-refresh" :disabled="recoveryLoading">
+              🔄 Refresh
             </button>
           </div>
         </div>
@@ -372,10 +490,10 @@ const loadCalendarFromCache = () => {
     const cached = getCache(CALENDAR_CACHE_KEY)
     // console.log("data " + cached)
     const timestamp = getCache(CALENDAR_TIMESTAMP_KEY)
-    
+
     if (cached && timestamp) {
       const cacheData = JSON.parse(cached)
-      
+
       // Check if cached data is for current month/year
       if (cacheData.month === selectedMonth.value && cacheData.year === selectedYear.value) {
         calendarData.value = cacheData.data
@@ -403,8 +521,8 @@ const saveTransactionsToCache = (data) => {
         symbol: transactionFilter.symbol
       }
     }
-    saveCacheData(cacheKey, JSON.stringify(cacheData) ,10)
-    saveCacheData(TRANSACTIONS_TIMESTAMP_KEY, new Date().toISOString() ,10)
+    saveCacheData(cacheKey, JSON.stringify(cacheData), 10)
+    saveCacheData(TRANSACTIONS_TIMESTAMP_KEY, new Date().toISOString(), 10)
     // console.log('✅ Transactions saved to cache')
   } catch (err) {
     console.error('Failed to save transactions to cache:', err)
@@ -415,20 +533,20 @@ const loadTransactionsFromCache = () => {
   try {
     const cacheKey = `${TRANSACTIONS_CACHE_KEY}_${selectedMonth.value}_${selectedYear.value}${selectedDay.value ? '_' + selectedDay.value.day : ''}`
     const cached = getCache(cacheKey)
-    
+
     if (cached) {
       const cacheData = JSON.parse(cached)
-      
+
       // Check if filters match
       if (cacheData.filters.type === transactionFilter.type &&
-          cacheData.filters.currency === transactionFilter.currency &&
-          cacheData.filters.symbol === transactionFilter.symbol) {
-        
+        cacheData.filters.currency === transactionFilter.currency &&
+        cacheData.filters.symbol === transactionFilter.symbol) {
+
         transactions.value = cacheData.data
         currentTransactionPage.value = cacheData.page
         hasMoreTransactions.value = cacheData.hasMore
         totalTransactionElements.value = cacheData.total
-        
+
         // console.log('✅ Transactions loaded from cache')
         return true
       }
@@ -452,14 +570,14 @@ const calendarDays = computed(() => {
 
 const monthlyStats = computed(() => {
   if (!calendarData.value?.days) return null
-  
+
   const days = calendarData.value.days
   const totalPnL = days.reduce((sum, day) => sum + day.pnl, 0)
   const profitDays = days.filter(day => day.pnl > 0).length
   const lossDays = days.filter(day => day.pnl < 0).length
   const bestDay = Math.max(...days.map(day => day.pnl))
   const worstDay = Math.min(...days.map(day => day.pnl))
-  
+
   return {
     totalPnL,
     profitDays,
@@ -472,18 +590,18 @@ const monthlyStats = computed(() => {
 // ============== STREAK CALCULATIONS (Fixed - ignores neutral days) ==============
 const streakStats = computed(() => {
   if (!calendarData.value?.days) return null
-  
+
   const days = calendarData.value.days
   // console.log('📊 Calculating streaks from days:', days.map(d => ({day: d.day, pnl: d.pnl})))
-  
+
   // Sort days by day number to ensure we process in order
   const sortedDays = [...days].sort((a, b) => a.day - b.day)
-  
+
   let currentWinStreak = 0
   let currentLossStreak = 0
   let longestWinStreak = 0
   let longestLossStreak = 0
-  
+
   // For tracking streak dates
   let currentWinStart = null
   let currentWinEnd = null
@@ -493,22 +611,22 @@ const streakStats = computed(() => {
   let longestWinEnd = null
   let longestLossStart = null
   let longestLossEnd = null
-  
+
   // Track ongoing streaks (ignoring neutral days)
   let ongoingWinStreak = 0
   let ongoingLossStreak = 0
   let ongoingWinStart = null
   let ongoingLossStart = null
-  
+
   // Track the last non-neutral result
   let lastNonNeutralResult = null // 'win' or 'loss'
-  
+
   for (let i = 0; i < sortedDays.length; i++) {
     const day = sortedDays[i]
-    
+
     if (day.pnl > 0) {
       // WIN DAY
-      
+
       // If last non-neutral was also a win, continue the streak
       if (lastNonNeutralResult === 'win') {
         ongoingWinStreak++
@@ -518,34 +636,34 @@ const streakStats = computed(() => {
         ongoingWinStreak = 1
         ongoingWinStart = day.day
       }
-      
+
       // Reset loss streak
       ongoingLossStreak = 0
       ongoingLossStart = null
-      
+
       // Update last non-neutral
       lastNonNeutralResult = 'win'
-      
+
       // Update current win streak (this is what's displayed)
       currentWinStreak = ongoingWinStreak
       currentWinEnd = day.day
       currentWinStart = ongoingWinStart
-      
+
       // Current loss streak is reset
       currentLossStreak = 0
       currentLossStart = null
       currentLossEnd = null
-      
+
       // Update longest win streak if needed
       if (ongoingWinStreak > longestWinStreak) {
         longestWinStreak = ongoingWinStreak
         longestWinStart = ongoingWinStart
         longestWinEnd = day.day
       }
-      
+
     } else if (day.pnl < 0) {
       // LOSS DAY
-      
+
       // If last non-neutral was also a loss, continue the streak
       if (lastNonNeutralResult === 'loss') {
         ongoingLossStreak++
@@ -555,39 +673,39 @@ const streakStats = computed(() => {
         ongoingLossStreak = 1
         ongoingLossStart = day.day
       }
-      
+
       // Reset win streak
       ongoingWinStreak = 0
       ongoingWinStart = null
-      
+
       // Update last non-neutral
       lastNonNeutralResult = 'loss'
-      
+
       // Update current loss streak (this is what's displayed)
       currentLossStreak = ongoingLossStreak
       currentLossEnd = day.day
       currentLossStart = ongoingLossStart
-      
+
       // Current win streak is reset
       currentWinStreak = 0
       currentWinStart = null
       currentWinEnd = null
-      
+
       // Update longest loss streak if needed
       if (ongoingLossStreak > longestLossStreak) {
         longestLossStreak = ongoingLossStreak
         longestLossStart = ongoingLossStart
         longestLossEnd = day.day
       }
-      
+
     } else {
       // NEUTRAL DAY - do nothing, streaks continue as they were
       console.log(`Day ${day.day} is neutral, streaks continue: win=${ongoingWinStreak}, loss=${ongoingLossStreak}`)
     }
-    
+
     console.log(`Day ${day.day}: pnl=${day.pnl}, currentWin=${currentWinStreak}, currentLoss=${currentLossStreak}`)
   }
-  
+
   // console.log('📊 Streak Results:', {
   //   currentWinStreak,
   //   currentLossStreak,
@@ -598,7 +716,7 @@ const streakStats = computed(() => {
   //   currentLossStart,
   //   currentLossEnd
   // })
-  
+
   return {
     currentWinStreak,
     currentLossStreak,
@@ -614,6 +732,105 @@ const streakStats = computed(() => {
     longestLossEnd
   }
 })
+
+// ============== RECOVERY PHASE STATE ==============
+const showRecoveryModal = ref(false)
+const recoveryLoading = ref(false)
+const recoveryError = ref(null)
+const recoveryData = ref(null)
+
+// Computed for progress circle
+const recoveryPercentageDeg = computed(() => {
+  if (!recoveryData.value) return 0
+  const percentage = Math.min(recoveryData.value.recoveryPercentage, 100)
+  return (percentage / 100) * 360
+})
+
+// ============== RECOVERY API CALL ==============
+const fetchRecoveryData = async () => {
+  recoveryLoading.value = true
+  recoveryError.value = null
+
+  try {
+    const token = getAuthToken()
+
+    const response = await fetch(`${API_BASE_URL}/transaction/recovery/debt`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    })
+
+    const data = await response.json()
+
+    if (data.code === '200') {
+      recoveryData.value = data.data
+      notification.success('Recovery data loaded successfully')
+    } else {
+      throw new Error(data.message || 'Failed to fetch recovery data')
+    }
+  } catch (err) {
+    recoveryError.value = err.message
+    notification.error(err.message)
+  } finally {
+    recoveryLoading.value = false
+  }
+}
+
+// Show recovery popup
+const showRecoveryPopup = async () => {
+  showRecoveryModal.value = true
+  await fetchRecoveryData()
+}
+
+// Close recovery popup
+const closeRecoveryModal = () => {
+  showRecoveryModal.value = false
+  recoveryData.value = null
+  recoveryError.value = null
+}
+
+// Helper functions for status messages
+const getStatusClass = () => {
+  if (!recoveryData.value) return ''
+  const percentage = recoveryData.value.recoveryPercentage
+  if (percentage >= 100) return 'status-success'
+  if (percentage >= 75) return 'status-great'
+  if (percentage >= 50) return 'status-good'
+  if (percentage >= 25) return 'status-progress'
+  return 'status-starting'
+}
+
+const getStatusIcon = () => {
+  if (!recoveryData.value) return '📊'
+  const percentage = recoveryData.value.recoveryPercentage
+  if (percentage >= 100) return '🎉'
+  if (percentage >= 75) return '🚀'
+  if (percentage >= 50) return '💪'
+  if (percentage >= 25) return '📈'
+  return '🌟'
+}
+
+const getStatusMessage = () => {
+  if (!recoveryData.value) return ''
+  const percentage = recoveryData.value.recoveryPercentage
+  const remaining = recoveryData.value.remainingDebt
+
+  if (percentage >= 100) {
+    return 'Congratulations! You have fully recovered your debt! 🎉'
+  }
+  if (percentage >= 75) {
+    return `Excellent progress! Only ${formatCurrency(remaining)} remaining to reach full recovery.`
+  }
+  if (percentage >= 50) {
+    return `More than halfway there! Keep going to recover the remaining ${formatCurrency(remaining)}.`
+  }
+  if (percentage >= 25) {
+    return `Good start! Continue trading to recover ${formatCurrency(remaining)} more.`
+  }
+  return `Every journey begins with a first step. Start trading to recover ${formatCurrency(remaining)}!`
+}
 
 // Check if any filters are active
 const hasActiveFilters = computed(() => {
@@ -647,7 +864,7 @@ const formatTransactionDate = (dateString) => {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const yesterday = new Date(today)
   yesterday.setDate(yesterday.getDate() - 1)
-  
+
   if (date >= today) {
     return `Today, ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
   } else if (date >= yesterday) {
@@ -689,14 +906,14 @@ const getAmountClass = (transaction) => {
 
 const formatTransactionAmount = (transaction) => {
   if (!transaction) return '-'
-  
+
   // Try different possible amount fields
   const amount = transaction.amount || transaction.pnl || transaction.value || 0
-  
+
   if (transaction.type === 'PROFIT' || transaction.type === 'LOSS') {
     return '¢' + formatMoney(amount)
   }
-  
+
   return ` ${formatCurrency(amount)}`
 }
 
@@ -760,13 +977,13 @@ const fetchMonthlyPerformance = async (forceRefresh = false) => {
       return
     }
   }
-  
+
   calendarLoading.value = true
   calendarError.value = null
-  
+
   try {
     const token = getAuthToken()
-    
+
     const response = await fetch(`${API_BASE_URL}/transaction/monthly/performance`, {
       method: 'POST',
       headers: {
@@ -778,10 +995,10 @@ const fetchMonthlyPerformance = async (forceRefresh = false) => {
         year: selectedYear.value
       })
     })
-    
+
     const data = await response.json()
     // console.log('📅 Calendar API response:', data)
-    
+
     if (data.code === '200') {
       calendarData.value = data.data
       // console.log('📅 Calendar days:', data.data.days)
@@ -809,34 +1026,34 @@ const fetchTransactions = async (reset = true) => {
       return
     }
   }
-  
+
   if (reset) {
     currentTransactionPage.value = 0
     transactions.value = []
   }
-  
+
   transactionsLoading.value = true
   transactionsError.value = null
-  
+
   try {
     const token = getAuthToken()
-    
+
     const payload = {
       size: transactionFilter.size || '10',
       page: currentTransactionPage.value.toString()
     }
-    
+
     if (transactionFilter.type) payload.type = transactionFilter.type
     if (transactionFilter.currency) payload.currency = transactionFilter.currency
     if (transactionFilter.symbol) payload.symbol = transactionFilter.symbol
-    
+
     if (selectedDay.value && calendarData.value) {
       const year = calendarData.value.year
       const month = String(calendarData.value.month).padStart(2, '0')
       const day = String(selectedDay.value.day).padStart(2, '0')
       payload.date = `${year}-${month}-${day}`
     }
-    
+
     const response = await fetch(`${API_BASE_URL}/transaction/fetch`, {
       method: 'POST',
       headers: {
@@ -845,21 +1062,21 @@ const fetchTransactions = async (reset = true) => {
       },
       body: JSON.stringify(payload)
     })
-    
+
     const data = await response.json()
-    
+
     if (data.code === '200') {
       if (reset) {
         transactions.value = data.data.content || []
       } else {
         transactions.value = [...transactions.value, ...(data.data.content || [])]
       }
-      
+
       totalTransactionElements.value = data.data.total_element || 0
       hasMoreTransactions.value = transactions.value.length < totalTransactionElements.value
-      
+
       saveTransactionsToCache(transactions.value)
-      
+
       if (reset && transactions.value.length === 0) {
         notification.info('No transactions found for this period')
       }
@@ -897,5 +1114,5 @@ onMounted(() => {
 </script>
 
 <style scoped>
-  @import '../assets/styles/performance.css';
+@import '../assets/styles/performance.css';
 </style>

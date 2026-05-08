@@ -6,7 +6,7 @@
   --spacing-md: 16px;
   --spacing-lg: 24px;
   --spacing-xl: 32px;
-  
+
   width: 100%;
   max-width: 100%;
   min-height: 100%;
@@ -36,11 +36,14 @@ button {
 }
 
 button:active {
-  transform: scale(0.98); /* Consistent press effect */
+  transform: scale(0.98);
+  /* Consistent press effect */
 }
 
 /* Remove browser default styles that might cause scaling */
-input, select, button {
+input,
+select,
+button {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
@@ -48,7 +51,8 @@ input, select, button {
 }
 
 /* Prevent zoom on input focus for iOS */
-@media screen and (-webkit-min-device-pixel-ratio: 0) { 
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+
   select,
   textarea,
   input {
@@ -105,7 +109,8 @@ input, select, button {
 /* Add some spacing between the two selects */
 .date-selector {
   display: flex;
-  gap: 12px; /* Increased gap */
+  gap: 12px;
+  /* Increased gap */
   flex-wrap: wrap;
   max-width: 100%;
 }
@@ -1032,7 +1037,9 @@ input, select, button {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Error states */
@@ -1130,7 +1137,7 @@ select::-ms-expand {
   .stat-card {
     min-width: 70px;
   }
-  
+
   .filter-select,
   .filter-input,
   .search-wrapper {
@@ -1143,7 +1150,7 @@ select::-ms-expand {
   .mobile-only {
     display: flex !important;
   }
-  
+
   .desktop-only {
     display: none !important;
   }
@@ -1160,11 +1167,12 @@ select::-ms-expand {
   }
 
   /* Month/Year selects - with improved spacing */
-.month-select,
+  .month-select,
   .year-select {
     min-width: 0;
     flex: 1;
-    height: 48px; /* Taller on mobile for better touch */
+    height: 48px;
+    /* Taller on mobile for better touch */
     min-height: 48px;
     max-height: 48px;
     font-size: 16px;
@@ -1333,16 +1341,65 @@ select::-ms-expand {
     max-height: 48px;
     font-size: 16px;
   }
+
+  .recovery-btn {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .modal-content {
+    max-width: 95%;
+    margin: 20px;
+  }
+
+  .progress-circle {
+    width: 140px;
+    height: 140px;
+  }
+
+  .progress-inner {
+    width: 115px;
+    height: 115px;
+  }
+
+  .progress-percentage {
+    font-size: 1.5rem;
+  }
+
+  .recovery-stats {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .recovery-stat-card {
+    padding: 12px;
+  }
+
+  .stat-value {
+    font-size: 1rem;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .btn-close,
+  .btn-refresh {
+    width: 100%;
+    padding: 12px;
+  }
 }
 
 /* Small mobile styles */
 @media (max-width: 480px) {
+
   .month-select,
   .year-select {
     padding: 8px 12px;
     padding-right: 36px;
     background-position: right 8px center;
   }
+
   .performance-page {
     padding: 8px;
   }
@@ -1440,6 +1497,24 @@ select::-ms-expand {
 
   .mobile-stat-value {
     font-size: 1rem;
+  }
+
+  .modal-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .progress-circle {
+    width: 120px;
+    height: 120px;
+  }
+
+  .progress-inner {
+    width: 98px;
+    height: 98px;
+  }
+
+  .progress-percentage {
+    font-size: 1.2rem;
   }
 }
 
@@ -1680,6 +1755,7 @@ select::-ms-expand {
 
 /* Reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
+
   .calendar-day,
   .transaction-card,
   .transaction-filters,
@@ -1697,7 +1773,7 @@ select::-ms-expand {
     transition: none;
     animation: none;
   }
-  
+
   .calendar-day:hover,
   .calendar-day:active,
   button:active,
@@ -1709,6 +1785,7 @@ select::-ms-expand {
     transform: none;
   }
 }
+
 .streak-cards {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1832,4 +1909,408 @@ select::-ms-expand {
   font-size: 8px;
   color: #9ca3af;
   margin-top: 2px;
+}
+
+/* Recovery Button */
+.recovery-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 150px;
+  height: 40px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.recovery-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.recovery-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.recovery-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Modal Content */
+.modal-content {
+  background: var(--bg-panel);
+  border-radius: 20px;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dark .modal-header {
+  border-bottom-color: #4b5563;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #6b7280;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.dark .modal-close:hover {
+  background: #4b5563;
+  color: white;
+}
+
+.modal-loading,
+.modal-error {
+  text-align: center;
+  padding: 60px 24px;
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+/* Progress Circle */
+.progress-circle-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 32px;
+}
+
+.progress-circle {
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: background 0.3s ease;
+}
+
+.progress-inner {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.progress-percentage {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #10b981;
+  line-height: 1;
+}
+
+.progress-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.dark .progress-percentage {
+  color: #34d399;
+}
+
+/* Recovery Stats Grid */
+.recovery-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.recovery-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 12px;
+  transition: transform 0.2s;
+}
+
+.dark .recovery-stat-card {
+  background: #374151;
+}
+
+.recovery-stat-card:hover {
+  transform: translateY(-2px);
+}
+
+.stat-icon {
+  font-size: 28px;
+}
+
+.stat-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.stat-value.debt {
+  color: #ef4444;
+}
+
+.stat-value.profit {
+  color: #10b981;
+}
+
+.stat-value.loss {
+  color: #ef4444;
+}
+
+.stat-value.recovered {
+  color: #3b82f6;
+}
+
+.stat-value.remaining {
+  color: #f59e0b;
+}
+
+/* Progress Bar */
+.progress-bar-container {
+  margin-bottom: 24px;
+}
+
+.progress-bar-bg {
+  background: #e5e7eb;
+  border-radius: 20px;
+  height: 12px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.dark .progress-bar-bg {
+  background: #4b5563;
+}
+
+.progress-bar-fill {
+  background: linear-gradient(90deg, #10b981, #34d399);
+  height: 100%;
+  border-radius: 20px;
+  transition: width 0.5s ease;
+  width: 0%;
+}
+
+.progress-bar-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+
+/* Status Message */
+.status-message {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  background: #f3f4f6;
+}
+
+.dark .status-message {
+  background: #374151;
+}
+
+.status-icon {
+  font-size: 28px;
+}
+
+.status-text {
+  flex: 1;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text-main);
+}
+
+.status-message.status-success {
+  background: #d1fae5;
+  border-left: 4px solid #10b981;
+}
+
+.status-message.status-great {
+  background: #e0f2fe;
+  border-left: 4px solid #3b82f6;
+}
+
+.status-message.status-good {
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+}
+
+.status-message.status-progress {
+  background: #f3e8ff;
+  border-left: 4px solid #9333ea;
+}
+
+.status-message.status-starting {
+  background: #fce7f3;
+  border-left: 4px solid #ec4899;
+}
+
+/* Modal Actions */
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btn-close,
+.btn-refresh {
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn-close {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.btn-close:hover {
+  background: #e5e7eb;
+}
+
+.btn-refresh {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.btn-refresh:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.btn-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Dark mode adjustments */
+.dark .recovery-stat-card:hover {
+  background: #4b5563;
+}
+
+.dark .btn-close {
+  background: #374151;
+  color: #9ca3af;
+}
+
+.dark .btn-close:hover {
+  background: #4b5563;
+  color: white;
 }
