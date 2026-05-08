@@ -2,8 +2,13 @@
   <div class="insight-page">
     <!-- Header -->
     <div class="page-header">
-      <h1>Market Insights</h1>
-      <p class="subtitle">Real-time news and economic events</p>
+      <div class="header-left">
+        <h1>Market Insights</h1>
+        <p class="subtitle">Real-time news and economic events</p>
+      </div>
+      <button class="daily-analysis-btn" @click="openDailyAnalysis">
+        📊 Daily Analysis
+      </button>
     </div>
 
     <!-- Main Content -->
@@ -17,7 +22,7 @@
           </button>
         </div>
 
-        <!-- Category Filter (Optional) -->
+        <!-- Category Filter -->
         <div class="filter-group">
           <label class="filter-label">Category</label>
           <select v-model="filters.category" class="filter-select">
@@ -33,7 +38,6 @@
             <option value="tech">Technology</option>
             <option value="crypto">Cryptocurrency</option>
           </select>
-          <!-- <small class="hint">Leave empty to search by keyword only</small> -->
         </div>
 
         <!-- Last Updated Filter -->
@@ -69,7 +73,6 @@
               class="keyword-input" />
             <button v-if="filters.keyword" @click="clearKeyword" class="clear-btn">✕</button>
           </div>
-          <!-- <small class="hint">If no category selected, keyword will be used as search term</small> -->
         </div>
 
         <!-- Trending Keywords -->
@@ -77,7 +80,6 @@
           <div class="trending-title">
             🔥 Trending Keywords
           </div>
-
           <div class="keyword-tags">
             <span v-for="(item, index) in trendingKeywords" :key="index" class="keyword-tag"
               @click="selectKeyword(item[0])">
@@ -150,11 +152,9 @@
 
         <!-- Tab Navigation -->
         <div class="tab-navigation">
-
-        <button class="tab-btn" :class="{ active: activeTab === 'news' }" @click="activeTab = 'news'">
+          <button class="tab-btn" :class="{ active: activeTab === 'news' }" @click="activeTab = 'news'">
             News Feed
           </button>
-
           <button class="tab-btn" :class="{ active: activeTab === 'events' }" @click="activeTab = 'events'">
             Forex Factory Calendar
           </button>
@@ -191,14 +191,11 @@
             </div>
 
             <div v-for="(item, index) in paginatedNews" :key="index" class="news-card">
-              <!-- Card Header -->
               <div class="news-header">
                 <div class="news-meta">
                   <span class="news-source">{{ item.source }}</span>
                 </div>
               </div>
-
-              <!-- Card Title -->
               <h3 class="news-title">
                 <a :href="item.link" target="_blank" rel="noopener noreferrer">
                   {{ item.title }}
@@ -248,7 +245,6 @@
               No economic events match your filters
             </div>
 
-            <!-- Date Group - Sorted Ascending (Tomorrow first, then next days) -->
             <div v-for="(group, date) in sortedEventGroupsAsc" :key="date" class="event-date-group">
               <div class="event-date-header">
                 <h4>{{ formatEventDate(date) }}</h4>
@@ -259,12 +255,10 @@
                 :class="getEventImpactClass(event.impact)">
                 <div class="event-time">
                   {{ formatEventTime(event.date) }}
-                  <!-- Countdown timer for today's events -->
                   <span v-if="isToday(date)" class="event-countdown">
                     {{ getCountdown(event.date) }}
                   </span>
                 </div>
-
                 <div class="event-content">
                   <div class="event-header">
                     <span class="event-country">{{ event.country }}</span>
@@ -272,9 +266,7 @@
                       {{ event.impact }}
                     </span>
                   </div>
-
                   <h4 class="event-title">{{ event.title }}</h4>
-
                   <div class="event-details">
                     <div class="event-detail">
                       <span class="detail-label">Forecast</span>
@@ -292,6 +284,116 @@
         </div>
       </div>
     </div>
+
+    <!-- Daily Analysis Modal -->
+    <div v-if="showAnalysisModal" class="modal-overlay" @click="closeModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h2>📊 Daily Market Analysis</h2>
+          <button class="modal-close" @click="closeModal">✕</button>
+        </div>
+        
+        <div v-if="analysisLoading" class="modal-loading">
+          <div class="spinner"></div>
+          <p>Loading analysis...</p>
+        </div>
+        
+        <div v-else-if="analysisError" class="modal-error">
+          <p>{{ analysisError }}</p>
+          <button @click="fetchDailyAnalysis" class="btn-retry">Retry</button>
+        </div>
+        
+        <div v-else-if="analysisData" class="modal-body">
+          <!-- Date -->
+          <div class="analysis-date">
+            📅 {{ formatAnalysisDate(analysisData.date) }}
+          </div>
+          
+          <!-- Trend Badge -->
+          <div class="trend-badge" :class="getTrendClass(analysisData.trend)">
+            {{ analysisData.trend }}
+          </div>
+          
+          <!-- Price Info -->
+          <div class="price-info">
+            <div class="price-card">
+              <div class="price-label">Current Price</div>
+              <div class="price-value">${{ formatNumber(analysisData.current_price) }}</div>
+            </div>
+            <div class="price-card">
+              <div class="price-label">Opening Price</div>
+              <div class="price-value">${{ formatNumber(analysisData.opening_price) }}</div>
+            </div>
+          </div>
+          
+          <!-- Gap Info -->
+          <div class="gap-info" :class="getGapClass(analysisData.gap)">
+            <div class="gap-label">Price Gap</div>
+            <div class="gap-value">
+              {{ analysisData.gap > 0 ? '+' : '' }}{{ formatNumber(analysisData.gap) }}
+              <span class="gap-percent">({{ calculateGapPercent(analysisData.gap, analysisData.opening_price) }}%)</span>
+            </div>
+          </div>
+          
+          <!-- Movement Analysis -->
+          <div class="movement-analysis">
+            <div class="movement-title">📈 Movement Analysis</div>
+            <div class="movement-details">
+              <div class="movement-item">
+                <span>Change:</span>
+                <strong :class="getChangeClass(analysisData.gap)">
+                  {{ analysisData.gap > 0 ? '+' : '' }}${{ formatNumber(analysisData.gap) }}
+                </strong>
+              </div>
+              <div class="movement-item">
+                <span>Percentage:</span>
+                <strong :class="getChangeClass(analysisData.gap)">
+                  {{ calculateGapPercent(analysisData.gap, analysisData.opening_price) }}
+                </strong>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Analysis Result -->
+          <div class="analysis-result">
+            <div class="result-title">💡 Analysis Result</div>
+            <div class="result-text">{{ analysisData.result }}</div>
+          </div>
+          
+          <!-- Recommendations -->
+          <div class="recommendations">
+            <div class="rec-title">🎯 Recommendations</div>
+            <div class="rec-list">
+              <div v-if="analysisData.trend === 'STRONG BULLISH'" class="rec-item bullish">
+                <span class="rec-icon">📈</span>
+                <span>Consider long positions with tight stop losses</span>
+              </div>
+              <div v-else-if="analysisData.trend === 'BULLISH'" class="rec-item bullish">
+                <span class="rec-icon">📈</span>
+                <span>Look for buying opportunities on pullbacks</span>
+              </div>
+              <div v-else-if="analysisData.trend === 'STRONG BEARISH'" class="rec-item bearish">
+                <span class="rec-icon">📉</span>
+                <span>Consider short positions or stay in cash</span>
+              </div>
+              <div v-else-if="analysisData.trend === 'BEARISH'" class="rec-item bearish">
+                <span class="rec-icon">📉</span>
+                <span>Look for selling opportunities on rallies</span>
+              </div>
+              <div v-else class="rec-item neutral">
+                <span class="rec-icon">⚖️</span>
+                <span>Wait for clearer direction before trading</span>
+              </div>
+              
+              <div v-if="Math.abs(analysisData.gap) > 50" class="rec-item warning">
+                <span class="rec-icon">⚠️</span>
+                <span>Large gap detected - be cautious of volatility</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -303,16 +405,15 @@ import { useCache } from '../composables/useCache'
 const { setCache, getCache } = useCache()
 
 const saveCacheData = (cacheName, data) => {
-  setCache(cacheName, data, 5) // Expires in 5 minutes
+  setCache(cacheName, data, 5)
 }
-// Initialize notification
 const notification = useNotification()
 
 // API Base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 const API_TRENDING_URL = import.meta.env.VITE_API_TRENDING_BASE_URL
 
-// Cache keys for localStorage
+// Cache keys
 const NEWS_CACHE_KEY = 'insight_news_cache'
 const NEWS_TIMESTAMP_KEY = 'insight_news_timestamp'
 const EVENTS_CACHE_KEY = 'insight_events_cache'
@@ -332,7 +433,13 @@ const currentTime = ref(new Date())
 const hasSearched = ref(false)
 let timerInterval = null
 
-//Keyword for news search
+// Daily Analysis State
+const showAnalysisModal = ref(false)
+const analysisData = ref(null)
+const analysisLoading = ref(false)
+const analysisError = ref(null)
+
+// Trending keywords
 const trendingKeywords = ref([])
 const keywordLoading = ref(false)
 
@@ -344,13 +451,106 @@ const filters = reactive({
   keyword: ''
 })
 
-// Available sources (computed from data)
+// Available sources
 const sources = computed(() => {
   const srcs = new Set(allNews.value.map(item => item.source).filter(Boolean))
   return Array.from(srcs).sort()
 })
 
-// ============== VALIDATION ==============
+// ============== DAILY ANALYSIS ==============
+const openDailyAnalysis = () => {
+  showAnalysisModal.value = true
+  fetchDailyAnalysis()
+}
+
+const closeModal = () => {
+  showAnalysisModal.value = false
+  analysisData.value = null
+  analysisError.value = null
+}
+
+const getAuthToken = () => {
+  const authToken = localStorage.getItem('authToken')
+  if (!authToken) {
+    notification.error('No authentication token found')
+    throw new Error('No authentication token found')
+  }
+  return authToken
+}
+
+const fetchDailyAnalysis = async () => {
+  analysisLoading.value = true
+  analysisError.value = null
+
+  try {
+    const token = getAuthToken()
+    
+    const response = await fetch(`${API_BASE_URL}/insight/daily-analysis`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    })
+
+    const data = await response.json()
+
+    if (data.code === '200') {
+      analysisData.value = data.data
+      notification.success('Daily analysis loaded')
+    } else {
+      throw new Error(data.message || 'Failed to fetch daily analysis')
+    }
+  } catch (err) {
+    analysisError.value = err.message
+    notification.error(err.message)
+  } finally {
+    analysisLoading.value = false
+  }
+}
+
+const formatAnalysisDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+const formatNumber = (value) => {
+  if (!value && value !== 0) return '0'
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
+}
+
+const calculateGapPercent = (gap, openingPrice) => {
+  if (!openingPrice || openingPrice === 0) return '0%'
+  const percent = (gap / openingPrice) * 100
+  return `${percent > 0 ? '+' : ''}${percent.toFixed(2)}%`
+}
+
+const getTrendClass = (trend) => {
+  if (!trend) return ''
+  return trend.toLowerCase().replace(' ', '-')
+}
+
+const getGapClass = (gap) => {
+  if (gap > 0) return 'positive'
+  if (gap < 0) return 'negative'
+  return 'neutral'
+}
+
+const getChangeClass = (gap) => {
+  if (gap > 0) return 'positive'
+  if (gap < 0) return 'negative'
+  return 'neutral'
+}
 
 // ============== CACHE MANAGEMENT ==============
 const saveNewsToCache = (data) => {
@@ -379,7 +579,6 @@ const loadNewsFromCache = () => {
     if (cached) {
       const cacheData = JSON.parse(cached)
 
-      // Check if filters match
       if (cacheData.filters.category === filters.category &&
         cacheData.filters.last_updated === filters.last_updated &&
         cacheData.filters.source === filters.source &&
@@ -406,7 +605,6 @@ const saveEventsToCache = (data) => {
     }
     saveCacheData(EVENTS_CACHE_KEY, JSON.stringify(cacheData), 1440)
     saveCacheData(EVENTS_TIMESTAMP_KEY, new Date().toISOString(), 30)
-
     console.log('✅ Events saved to cache')
   } catch (err) {
     console.error('Failed to save events to cache:', err)
@@ -420,7 +618,6 @@ const loadEventsFromCache = () => {
     if (cached) {
       const cacheData = JSON.parse(cached)
 
-      // Check if filters match
       if (cacheData.filters.keyword === filters.keyword) {
         events.value = cacheData.data
         console.log('✅ Events loaded from cache')
@@ -452,19 +649,15 @@ onUnmounted(() => {
   }
 })
 
-// Filtered news (client-side filtering)
+// Filtered news
 const filteredNews = computed(() => {
   return allNews.value.filter(item => {
-    // Source filter
     if (filters.source && item.source !== filters.source) return false
-
-    // Keyword search (if keyword exists and we're not using it as category)
     if (filters.keyword && filters.category) {
       const keyword = filters.keyword.toLowerCase()
       const titleMatch = item.title?.toLowerCase().includes(keyword)
       if (!titleMatch) return false
     }
-
     return true
   })
 })
@@ -472,18 +665,16 @@ const filteredNews = computed(() => {
 // Filtered events
 const filteredEvents = computed(() => {
   return events.value.filter(event => {
-    // Keyword search
     if (filters.keyword) {
       const keyword = filters.keyword.toLowerCase()
       const titleMatch = event.title?.toLowerCase().includes(keyword)
       if (!titleMatch) return false
     }
-
     return true
   })
 })
 
-// Parse date string (DD-MM-YYYY HH:MM:SS) to Date object
+// Parse date string
 const parseEventDate = (dateStr) => {
   if (!dateStr) return new Date(0)
   const [datePart, timePart] = dateStr.split(' ')
@@ -492,7 +683,6 @@ const parseEventDate = (dateStr) => {
   return new Date(year, month - 1, day, hours || 0, minutes || 0, seconds || 0)
 }
 
-// Check if date is today
 const isToday = (dateStr) => {
   const today = new Date()
   const [day, month, year] = dateStr.split('-').map(Number)
@@ -501,22 +691,14 @@ const isToday = (dateStr) => {
     year === today.getFullYear()
 }
 
-// Get countdown time for event
 const getCountdown = (dateTime) => {
   if (!dateTime) return ''
-
   const eventDate = parseEventDate(dateTime)
   const now = currentTime.value
-
-  // If event already passed
-  if (eventDate < now) {
-    return 'Ended'
-  }
-
+  if (eventDate < now) return 'Ended'
   const diffMs = eventDate - now
   const diffHrs = Math.floor(diffMs / (1000 * 60 * 60))
   const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
-
   if (diffHrs > 24) {
     const diffDays = Math.floor(diffHrs / 24)
     return `${diffDays}d ${diffHrs % 24}h`
@@ -529,20 +711,14 @@ const getCountdown = (dateTime) => {
   }
 }
 
-// Group and sort events by date (upcoming first, past last)
+// Group and sort events
 const sortedEventGroupsAsc = computed(() => {
-  // First, group events by date
   const groups = {}
-
   filteredEvents.value.forEach(event => {
-    const date = event.date.split(' ')[0] // Get date part only
-    if (!groups[date]) {
-      groups[date] = []
-    }
+    const date = event.date.split(' ')[0]
+    if (!groups[date]) groups[date] = []
     groups[date].push(event)
   })
-
-  // Sort events within each date by time (ascending)
   Object.keys(groups).forEach(date => {
     groups[date].sort((a, b) => {
       const timeA = a.date.split(' ')[1] || ''
@@ -550,49 +726,32 @@ const sortedEventGroupsAsc = computed(() => {
       return timeA.localeCompare(timeB)
     })
   })
-
   const now = currentTime.value
-
-  // Separate upcoming and past dates
   const upcomingDates = []
   const pastDates = []
-
   Object.keys(groups).forEach(date => {
-    const eventDate = parseEventDate(date + ' 00:00:00')
     const lastEventTime = parseEventDate(date + ' 23:59:59')
-
     if (lastEventTime < now) {
-      // All events on this date are in the past
       pastDates.push(date)
     } else {
-      // This date has upcoming events
       upcomingDates.push(date)
     }
   })
-
-  // Sort upcoming dates in ascending order (soonest first)
   upcomingDates.sort((a, b) => {
     const dateA = parseEventDate(a + ' 00:00:00')
     const dateB = parseEventDate(b + ' 00:00:00')
     return dateA - dateB
   })
-
-  // Sort past dates in descending order (most recent past first)
   pastDates.sort((a, b) => {
     const dateA = parseEventDate(a + ' 00:00:00')
     const dateB = parseEventDate(b + ' 00:00:00')
     return dateB - dateA
   })
-
-  // Combine: upcoming first, then past
   const sortedDates = [...upcomingDates, ...pastDates]
-
-  // Create new object with sorted dates
   const sortedGroups = {}
   sortedDates.forEach(date => {
     sortedGroups[date] = groups[date]
   })
-
   return sortedGroups
 })
 
@@ -600,7 +759,6 @@ const sortedEventGroupsAsc = computed(() => {
 const todayEventsCount = computed(() => {
   const today = new Date()
   const todayStr = `${String(today.getDate()).padStart(2, '0')}-${String(today.getMonth() + 1).padStart(2, '0')}-${today.getFullYear()}`
-
   return filteredEvents.value.filter(event => {
     const eventDate = event.date.split(' ')[0]
     return eventDate === todayStr
@@ -608,10 +766,7 @@ const todayEventsCount = computed(() => {
 })
 
 // Pagination
-const totalPages = computed(() =>
-  Math.ceil(filteredNews.value.length / itemsPerPage.value)
-)
-
+const totalPages = computed(() => Math.ceil(filteredNews.value.length / itemsPerPage.value))
 const paginatedNews = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage.value
   const end = start + itemsPerPage.value
@@ -620,54 +775,32 @@ const paginatedNews = computed(() => {
 
 // Stats
 const totalNews = computed(() => allNews.value.length)
-const highImpactEvents = computed(() =>
-  filteredEvents.value.filter(e => e.impact === 'High').length
-)
-
+const highImpactEvents = computed(() => filteredEvents.value.filter(e => e.impact === 'High').length)
 const hasActiveFilters = computed(() => {
-  return filters.category ||
-    filters.last_updated ||
-    filters.source ||
-    filters.keyword
+  return filters.category || filters.last_updated || filters.source || filters.keyword
 })
 
-// ============== SEARCH FUNCTION ==============
+// Search functions
 const handleSearch = async () => {
-  // Validate that either category or keyword is provided
   if (!filters.category && !filters.keyword) {
     notification.error('Please select a category or enter a keyword')
     return
   }
-
   hasSearched.value = true
   currentPage.value = 1
-
-  // Try to load from cache first
   const loaded = loadNewsFromCache()
-  if (loaded) {
-    return
-  }
-
-  // If not in cache, fetch from API
+  if (loaded) return
   await fetchNews(true)
 }
 
-// Helper functions
 const formatEventDate = (dateStr) => {
   const today = new Date()
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
-
-  // Parse DD-MM-YYYY format
   const [day, month, year] = dateStr.split('-').map(Number)
   const eventDate = new Date(year, month - 1, day)
-
-  if (eventDate.toDateString() === today.toDateString()) {
-    return 'Today'
-  } else if (eventDate.toDateString() === tomorrow.toDateString()) {
-    return 'Tomorrow'
-  }
-
+  if (eventDate.toDateString() === today.toDateString()) return 'Today'
+  if (eventDate.toDateString() === tomorrow.toDateString()) return 'Tomorrow'
   return eventDate.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -680,8 +813,6 @@ const formatEventTime = (dateTime) => {
   if (!dateTime) return 'All Day'
   const [, time] = dateTime.split(' ')
   if (!time) return 'All Day'
-
-  // Convert 24h to 12h format
   const [hours, minutes] = time.split(':')
   const hour = parseInt(hours)
   const ampm = hour >= 12 ? 'PM' : 'AM'
@@ -694,17 +825,8 @@ const getEventImpactClass = (impact) => {
   return impact.toLowerCase()
 }
 
-// Apply filters and reset page
 const applyFilters = () => {
   currentPage.value = 1
-}
-
-const debounce = (fn, delay) => {
-  let timeoutId
-  return (...args) => {
-    clearTimeout(timeoutId)
-    timeoutId = setTimeout(() => fn(...args), delay)
-  }
 }
 
 const clearKeyword = () => {
@@ -722,28 +844,12 @@ const resetFilters = () => {
   applyFilters()
 }
 
-// Get auth token
-const getAuthToken = () => {
-  const authToken = localStorage.getItem('authToken')
-  if (!authToken) {
-    notification.error('No authentication token found')
-    throw new Error('No authentication token found')
-  }
-  return authToken
-}
-
 const fetchTrendingKeywords = async () => {
   keywordLoading.value = true
-
   try {
     const response = await fetch(`${API_TRENDING_URL}/trends`)
     const data = await response.json()
-
-    // API format:
-    // { top_keywords: [["iran",10],["oil",6],...] }
-
     trendingKeywords.value = data.top_keywords || []
-
   } catch (err) {
     console.error("Failed to fetch keywords:", err)
   } finally {
@@ -756,29 +862,15 @@ const selectKeyword = (keyword) => {
   applyFilters()
 }
 
-// Fetch news using new API
 const fetchNews = async (forceRefresh = false) => {
   newsLoading.value = true
   error.value = null
-
   try {
     const token = getAuthToken()
-
-    // Determine what to use as category
-    // If category is selected, use that
-    // Otherwise, use the keyword as the category
     const searchCategory = filters.category || filters.keyword
-
-    const payload = {
-      category: searchCategory
-    }
-
-    if (filters.last_updated) {
-      payload.last_updated = filters.last_updated
-    }
-
+    const payload = { category: searchCategory }
+    if (filters.last_updated) payload.last_updated = filters.last_updated
     console.log('🔍 Searching news with payload:', payload)
-
     const response = await fetch(`${API_BASE_URL}/insight/news`, {
       method: 'POST',
       headers: {
@@ -787,9 +879,7 @@ const fetchNews = async (forceRefresh = false) => {
       },
       body: JSON.stringify(payload)
     })
-
     const data = await response.json()
-
     if (data.code === '200') {
       allNews.value = data.data.data || []
       saveNewsToCache(allNews.value)
@@ -805,22 +895,15 @@ const fetchNews = async (forceRefresh = false) => {
   }
 }
 
-// Fetch Forex Factory events
 const fetchEvents = async (forceRefresh = false) => {
-  // Try to load from cache first (NO API CALL)
   if (!forceRefresh) {
     const loaded = loadEventsFromCache()
-    if (loaded) {
-      return
-    }
+    if (loaded) return
   }
-
   eventsLoading.value = true
   eventsError.value = null
-
   try {
     const token = getAuthToken()
-
     const response = await fetch(`${API_BASE_URL}/insight/events`, {
       method: 'GET',
       headers: {
@@ -828,9 +911,7 @@ const fetchEvents = async (forceRefresh = false) => {
         'Authorization': `Bearer ${token}`
       }
     })
-
     const data = await response.json()
-
     if (data.code === '200') {
       events.value = data.data || []
       saveEventsToCache(events.value)
@@ -846,12 +927,11 @@ const fetchEvents = async (forceRefresh = false) => {
   }
 }
 
-// Watch for filter changes (only for UI updates, not API calls)
 watch([() => filters.source, () => filters.keyword], () => {
   applyFilters()
 })
 </script>
 
 <style scoped>
-@import '../assets/styles/insight.css';
+    @import '../assets/styles/insight.css';
 </style>

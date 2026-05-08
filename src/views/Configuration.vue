@@ -494,7 +494,7 @@ const deleteConfig = async (id) => {
   try {
     const token = getAuthToken()
 
-    const response = await fetch(`${API_BASE_URL}/delete`, {
+    const response = await fetch(`${API_BASE_URL}/config/delete`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
