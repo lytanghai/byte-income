@@ -72,19 +72,6 @@
           <!-- <small class="hint">If no category selected, keyword will be used as search term</small> -->
         </div>
 
-        <!-- Trending Keywords -->
-        <div class="trending-keywords" v-if="trendingKeywords.length > 0">
-          <div class="trending-title">
-            🔥 Trending Keywords
-          </div>
-
-          <div class="keyword-tags">
-            <span v-for="(item, index) in trendingKeywords" :key="index" class="keyword-tag"
-              @click="selectKeyword(item[0])">
-              {{ item[0] }} ({{ item[1] }})
-            </span>
-          </div>
-        </div>
 
         <!-- Search Button -->
         <div class="filter-group">
@@ -310,7 +297,6 @@ const notification = useNotification()
 
 // API Base URL
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
-const API_TRENDING_URL = import.meta.env.VITE_API_TRENDING_BASE_URL
 
 // Cache keys for localStorage
 const NEWS_CACHE_KEY = 'insight_news_cache'
@@ -332,9 +318,6 @@ const currentTime = ref(new Date())
 const hasSearched = ref(false)
 let timerInterval = null
 
-//Keyword for news search
-const trendingKeywords = ref([])
-const keywordLoading = ref(false)
 
 // Filters
 const filters = reactive({
@@ -442,7 +425,6 @@ const startTimer = () => {
 
 onMounted(() => {
   fetchEvents()
-  fetchTrendingKeywords()
   startTimer()
 })
 
@@ -730,30 +712,6 @@ const getAuthToken = () => {
     throw new Error('No authentication token found')
   }
   return authToken
-}
-
-const fetchTrendingKeywords = async () => {
-  keywordLoading.value = true
-
-  try {
-    const response = await fetch(`${API_TRENDING_URL}/trends`)
-    const data = await response.json()
-
-    // API format:
-    // { top_keywords: [["iran",10],["oil",6],...] }
-
-    trendingKeywords.value = data.top_keywords || []
-
-  } catch (err) {
-    console.error("Failed to fetch keywords:", err)
-  } finally {
-    keywordLoading.value = false
-  }
-}
-
-const selectKeyword = (keyword) => {
-  filters.keyword = keyword
-  applyFilters()
 }
 
 // Fetch news using new API
