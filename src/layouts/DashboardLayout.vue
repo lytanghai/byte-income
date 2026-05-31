@@ -23,6 +23,11 @@
                     <RouterLink @click="closeSidebar" to="/report">
                         <span class="menu-text">Report</span>
                     </RouterLink>
+
+                    <RouterLink @click="closeSidebar" to="/milestone">
+                        <span class="menu-text">Milestone</span>
+                    </RouterLink>
+
                     <RouterLink @click="closeSidebar" to="/calculator">
                         <span class="menu-text">Calculator</span>
                     </RouterLink>

@@ -8,6 +8,7 @@ import Insight from '../views/Insight.vue'
 import Transaction from '../views/Transaction.vue'
 import Market from '../views/Market.vue'
 import Report from '../views/Report.vue'
+import Milestone from '../views/Milestone.vue'
 import Users from '../views/Users.vue'
 import Cache from '../views/Cache.vue'
 import Configuration from '../views/Configuration.vue'
@@ -37,6 +38,7 @@ const routes = [
       { path: 'insight', name: 'Insight', component: Insight },
       { path: 'market', name: 'Market', component: Market },
       { path: 'report', name: 'Report', component: Report },
+      { path: 'milestone', name: 'Milestone', component: Milestone },
       { path: 'calculator', name: 'Calculator', component: Calculator},
       { path: 'polymarket', name: 'Polymarket', component: Polymarket},
       { path: 'tradingView', name: 'TradingView', component: TradingView},
