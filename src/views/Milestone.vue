@@ -334,7 +334,7 @@
                 <div v-for="user in usersList" :key="user.user_id" class="user-item">
                   <div class="user-avatar">{{ getUserInitial(user.user_id) }}</div>
                   <div class="user-info">
-                    <div class="user-name">User ID: {{ user.user_id }}</div>
+                    <div class="user-name">User ID: {{ user.user_id }} - {{ user.username }}</div>
                     <div class="user-email">
                       Status: 
                       <span :class="user.is_enabled ? 'status-enabled' : 'status-disabled'">
