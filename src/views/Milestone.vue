@@ -579,7 +579,7 @@ const fetchMilestones = async () => {
   error.value = null
   
   try {
-    const response = await fetch(`${API_BASE_URL}/milestone_tracker/milestone/fetch`, {
+    const response = await fetch(`${API_BASE_URL}/milestone/fetch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ page: 0, size: 100 })
@@ -605,7 +605,7 @@ const fetchMilestones = async () => {
 const fetchMilestoneDetails = async (id) => {
   fetchingDetails.value = true
   try {
-    const response = await fetch(`${API_BASE_URL}/milestone_tracker/milestone/query/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/milestone/query/${id}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' }
     })
@@ -640,7 +640,7 @@ const fetchMilestoneDetails = async (id) => {
 
 const createMilestone = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/milestone_tracker/milestone/create`, {
+    const response = await fetch(`${API_BASE_URL}/milestone/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(formData.value)
@@ -681,7 +681,7 @@ const updateMilestone = async () => {
       }))
     }
     
-    const response = await fetch(`${API_BASE_URL}/milestone_tracker/milestone/update`, {
+    const response = await fetch(`${API_BASE_URL}/milestone/update`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updateData)
@@ -706,7 +706,7 @@ const updateMilestone = async () => {
 
 const deleteMilestone = async (id) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/milestone_tracker/milestone/delete/${id}`, {
+    const response = await fetch(`${API_BASE_URL}/milestone/delete/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     })
@@ -734,7 +734,7 @@ const fetchUsers = async () => {
   usersError.value = null
   
   try {
-    const response = await fetch(`${API_BASE_URL}/milestone_tracker/uma/fetch`, {
+    const response = await fetch(`${API_BASE_URL}/uma/fetch`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ page: 0, size: 100 })
@@ -763,7 +763,7 @@ const updateUserAccess = async (user) => {
   try {
     const originalState = user.is_enabled
     
-    const response = await fetch(`${API_BASE_URL}/milestone_tracker/uma/update/${user.user_id}`, {
+    const response = await fetch(`${API_BASE_URL}/uma/update/${user.user_id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' }
     })
