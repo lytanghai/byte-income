@@ -270,7 +270,7 @@
             <select id="symbol" v-model="form.symbol" class="form-select">
               <option value="">-- Select Symbol --</option>
               <option value="USD">USD</option>
-              <option value="XAU">XAU (Gold)</option>
+              <option value="XAU" selected>XAU (Gold)</option>
               <option value="XAG">XAG (Silver)</option>
               <option value="AUD">AUD</option>
               <option value="EUR">EUR</option>
@@ -315,7 +315,7 @@
             <select id="currency" v-model="form.currency" class="form-select">
               <option value="">Select Currency</option>
               <option value="USD">USD</option>
-              <option value="USDC">USDC</option>
+              <option value="USDC" selected>USDC</option>
             </select>
           </div>
 
